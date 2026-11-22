@@ -92,3 +92,40 @@ export function villageOnly(colors, { idp = 'v', bare = true, layers = null, mon
 export function variantOf(id) {
   return VILLAGE_VARIANTS.find((v) => v.id === id) || VILLAGE_VARIANTS[0];
 }
+
+/** Превʼю «як розписано вручну»: натуральне дерево з волокнами й торцем фанери,
+   акрил із нерівним краєм, фактурою мазків і ледь прозорим шаром. Лише для карток барабана —
+   3D-текстури й майстерня користуються звичайним starOnly. */
+export function starHandmade(designId, colors, { idp = 'hm', seed = 3 } = {}) {
+  const d = DESIGN[designId];
+  const wood = renderObject(d, { idp, colors, bare: true, layers: new Set() });
+  const paintL = renderObject(d, { idp, colors, bare: false });
+  const fx = `<defs>
+  <filter id="${idp}-wf" x="-6%" y="-6%" width="114%" height="116%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.32" numOctaves="3" seed="${seed}" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 .45  0 0 0 0 .28  0 0 0 0 .12  0 0 -1.6 0 .9" result="grain"/>
+    <feComposite in="grain" in2="SourceAlpha" operator="in" result="g2"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="${seed + 5}" result="pores"/>
+    <feColorMatrix in="pores" type="matrix" values="0 0 0 0 .35  0 0 0 0 .22  0 0 0 0 .1  0 0 -1.2 0 .62" result="p1"/>
+    <feComposite in="p1" in2="SourceAlpha" operator="in" result="p2"/>
+    <feMerge result="woodTop"><feMergeNode in="SourceGraphic"/><feMergeNode in="g2"/><feMergeNode in="p2"/></feMerge>
+    <feOffset in="SourceAlpha" dx=".6" dy="2.2" result="off"/>
+    <feFlood flood-color="#7a5430"/><feComposite in2="off" operator="in" result="edge"/>
+    <feGaussianBlur in="SourceAlpha" stdDeviation="3.5"/><feOffset dy="6" result="sb"/>
+    <feFlood flood-color="#000" flood-opacity=".55"/><feComposite in2="sb" operator="in" result="shadow"/>
+    <feMerge><feMergeNode in="shadow"/><feMergeNode in="edge"/><feMergeNode in="woodTop"/></feMerge>
+  </filter>
+  <filter id="${idp}-pf" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="${seed + 1}" result="wob"/>
+    <feDisplacementMap in="SourceGraphic" in2="wob" scale="1.5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.32 0.08" numOctaves="2" seed="${seed + 2}" result="brush"/>
+    <feDiffuseLighting in="brush" surfaceScale="1.1" lighting-color="#fff" result="lit"><feDistantLight azimuth="235" elevation="58"/></feDiffuseLighting>
+    <feComponentTransfer in="lit" result="soft"><feFuncR type="linear" slope=".2" intercept=".84"/><feFuncG type="linear" slope=".2" intercept=".84"/><feFuncB type="linear" slope=".2" intercept=".84"/></feComponentTransfer>
+    <feBlend in="soft" in2="d" mode="multiply" result="m"/>
+    <feComposite in="m" in2="d" operator="in" result="painted"/>
+    <feComponentTransfer in="painted"><feFuncA type="table" tableValues="0 .86 .92"/></feComponentTransfer>
+  </filter>
+</defs>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-104 -104 208 212" width="416" height="424">${defs(idp)}${fx}<g filter="url(#${idp}-wf)">${wood}</g><g filter="url(#${idp}-pf)">${paintL}</g></svg>`;
+}
+export const svgUrl = (svg) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);

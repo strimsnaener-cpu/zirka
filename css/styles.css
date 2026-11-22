@@ -391,3 +391,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 16px; }
 .tp-go { width: 100%; }
 .sparks { opacity: 1; }
 body:not([data-view="showcase"]) .sparks { opacity: .4; }
+
+/* ---- превʼю «розписано вручну» ---- */
+.dc-art { background: radial-gradient(80% 70% at 32% 22%, #5a3f2b 0%, #2c1f17 55%, #1a120d 100%); }
+.dc-art img { width: 90%; height: auto; aspect-ratio: 416 / 424; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; }

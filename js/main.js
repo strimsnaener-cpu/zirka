@@ -2,9 +2,9 @@
 import { ASSETS, LANDING, BRAND, PAINTS, PAINT } from './config.js';
 import { state, set, subscribe } from './store.js';
 import { renderWorkshop, setMode, setObject, focusObject, setToast, onFinish, visibleLayers, stepsOf } from './workshop.js';
-import { compose, variantOf, starOnly } from './compose.js';
+import { compose, variantOf, starHandmade, svgUrl } from './compose.js';
 import { DESIGN, DESIGNS, LEVELS, PRESETS, presetColors } from './ornaments.js';
-import { initCarvedBg, initDrum, initScrollFx } from './landing-fx.js';
+import { initAmbientBg, initDrum, initScrollFx } from './landing-fx.js';
 import { initPlayer } from './player.js';
 import { renderPNG, downloadBlob } from './export.js';
 
@@ -190,7 +190,7 @@ function applyDesign(id) {
 // Крок 1 · барабан узорів
 const drum = initDrum($('#drum'), $('#drumRing'), {
   render: (d) => `<div class="dc" data-id="${d.id}">
-      <div class="dc-art">${starOnly(d.id, presetColors(d, 'classic'), { idp: 'dr-' + d.id })}</div>
+      <div class="dc-art"><img src="${svgUrl(starHandmade(d.id, presetColors(d, 'classic'), { idp: 'hm', seed: 3 + (d.id.length % 7) }))}" alt="" draggable="false"></div>
       <div class="dc-meta"><b>${esc(d.title)}</b><small>${esc(d.origin || levelTitle(d.level))}</small></div>
       <span class="dc-open" aria-hidden="true">Обрати</span></div>`,
   onActive: (d) => {
@@ -260,7 +260,7 @@ if ('IntersectionObserver' in window) {
 } else tryVisible = true;
 
 // фон і скрол-ефекти
-initCarvedBg($('#bgfx'));
+initAmbientBg($('#bgfx'));
 const fx = initScrollFx({ isActive: onShowcase });
 
 /* ---------- реактивність ---------- */

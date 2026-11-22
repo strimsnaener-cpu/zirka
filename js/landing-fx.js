@@ -1,83 +1,51 @@
-/* Ефекти майстерні: живий «різьблений» вихор на фоні (Canvas 2D, реагує на палець і курсор),
+/* Ефекти майстерні: делікатний 3D-фон (теплі пилинки-боке й тонкі контури зірок у глибині, туман),
    3D-барабан узорів з інерцією, м’які скрол-ефекти. Без важких бібліотек — плавно і на телефоні. */
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2;
 
-/* ---------- 1. Різьблений різдвяний вихор ---------- */
-export function initCarvedBg(canvas) {
+/* ---------- 1. Ambient 3D: «є, але не заважає» ---------- */
+export function initAmbientBg(canvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  // світлові «іскри»-спрайти, намальовані один раз
-  const sprite = (inner, mid, size = 64) => {
+  // м’які спрайти, намальовані один раз
+  const sprite = (stops, size) => {
     const c = document.createElement('canvas');
     c.width = c.height = size;
     const g = c.getContext('2d');
     const r = size / 2;
     const gr = g.createRadialGradient(r, r, 0, r, r, r);
-    gr.addColorStop(0, inner); gr.addColorStop(0.22, mid); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    stops.forEach(([o, col]) => gr.addColorStop(o, col));
     g.fillStyle = gr; g.fillRect(0, 0, size, size);
     return c;
   };
-  const GOLD = sprite('rgba(255,240,205,1)', 'rgba(230,184,92,.55)');
-  const CREAM = sprite('rgba(255,250,242,1)', 'rgba(245,239,230,.35)');
-  const EMBER = sprite('rgba(255,215,170,1)', 'rgba(190,70,50,.45)');
-  const HALO = sprite('rgba(230,184,92,.32)', 'rgba(230,184,92,.1)', 256);
+  // боке: майже рівний диск із розмитим краєм; пилинка: маленька тепла крапка
+  const BOKEH = sprite([[0, 'rgba(255,226,170,.9)'], [0.55, 'rgba(240,196,120,.75)'], [0.78, 'rgba(230,184,92,.25)'], [1, 'rgba(230,184,92,0)']], 96);
+  const DUST = sprite([[0, 'rgba(255,244,220,1)'], [0.25, 'rgba(240,200,130,.5)'], [1, 'rgba(230,184,92,0)']], 32);
 
-  // «різьблені» контури: розетки з 8 променями (як у восьмикутної зірки й сніжинки)
+  // контур восьмикутної зірки (вершини в площині XY, радіус 1)
+  const STAR = [];
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU - Math.PI / 2, r = i % 2 ? 0.52 : 1; STAR.push([Math.cos(a) * r, Math.sin(a) * r]); }
+  const RING = [];
+  for (let i = 0; i < 48; i++) { const a = (i / 48) * TAU; RING.push([Math.cos(a) * 0.36, Math.sin(a) * 0.36]); }
+
+  const FOG = 0.2; // щільність туману (як FogExp2)
+  const Z0 = 1.2, Z1 = 10;
+  let w = 0, h = 0, dpr = 1, f = 500, motes = [];
   const shapes = [
-    (a) => 0.78 + 0.22 * Math.cos(8 * a), // м’яка восьмикутна зірка
-    (a) => 0.55 + 0.45 * Math.pow(Math.abs(Math.cos(4 * a)), 0.6), // пелюстки
-    (a) => 0.86 + 0.08 * Math.cos(16 * a) + 0.06 * Math.cos(8 * a), // мереживо по краю
-    (a) => 0.62 + 0.38 * Math.pow(Math.abs(Math.sin(4 * a + Math.PI / 8)), 1.4), // гострі промені
+    { x: -1.5, y: -0.6, z: 6.5, s: 1.5, rx: 0.4, ry: 0.2, vr: 0.035, a: 0.2 },
+    { x: 1.7, y: 0.5, z: 8.5, s: 2.1, rx: -0.3, ry: 0.6, vr: -0.025, a: 0.16 },
+    { x: 0.2, y: 1.4, z: 9.5, s: 1.2, rx: 0.9, ry: -0.4, vr: 0.03, a: 0.14 },
   ];
-  const rings = [
-    { k: 0.2, shape: 1, dir: 1, sp: 0.09, a: 0.16 },
-    { k: 0.36, shape: 3, dir: -1, sp: 0.06, a: 0.12 },
-    { k: 0.54, shape: 0, dir: 1, sp: 0.045, a: 0.11 },
-    { k: 0.74, shape: 2, dir: -1, sp: 0.03, a: 0.06 },
-    { k: 0.98, shape: 0, dir: 1, sp: 0.02, a: 0.04 },
-  ];
-  const N = 192;
-  const pathOf = (fn, twist) => {
-    const p = new Path2D();
-    for (let i = 0; i <= N; i++) {
-      const a = (i / N) * TAU;
-      const r = fn(a);
-      const aa = a + twist * (1 - r); // закрутка до центру — ефект воронки
-      i ? p.lineTo(Math.cos(aa) * r, Math.sin(aa) * r) : p.moveTo(Math.cos(aa) * r, Math.sin(aa) * r);
-    }
-    return p;
-  };
-  const paths = rings.map((r, i) => pathOf(shapes[r.shape], i % 2 ? -0.22 : 0.22));
-  // спиці-«різьба»: 16 тонких дуг від центру назовні
-  const spokes = new Path2D();
-  for (let i = 0; i < 16; i++) {
-    const a0 = (i / 16) * TAU;
-    for (let j = 0; j <= 40; j++) {
-      const t = j / 40, r = 0.08 + t * 0.92, a = a0 + Math.sin(t * Math.PI) * 0.35 * (i % 2 ? 1 : -1) + t * 0.6;
-      j ? spokes.lineTo(Math.cos(a) * r, Math.sin(a) * r) : spokes.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-    }
-  }
 
-  let w = 0, h = 0, dpr = 1, R = 300, parts = [];
-  const cx = { x: 0, y: 0 }; // центр вихору (м’яко тягнеться до пальця)
-  const ptr = { x: 0, y: 0, sx: 0, sy: 0, on: 0, energy: 0, last: 0 };
-  const bursts = [];
-
-  const make = (fresh) => {
-    const k = Math.random();
+  const make = (far) => {
+    const bokeh = Math.random() < 0.3;
     return {
-      a: Math.random() * TAU,
-      r: fresh ? 0.9 + Math.random() * 0.25 : 0.05 + Math.random() * 1.1,
-      v: 0.025 + Math.random() * 0.05, // швидкість затягування у воронку
-      sp: (0.12 + Math.random() * 0.2) * (Math.random() < 0.82 ? 1 : -1),
-      s: 1.6 + Math.random() * 3.6,
-      img: k < 0.55 ? GOLD : k < 0.9 ? CREAM : EMBER,
-      tw: 1 + Math.random() * 3, ph: Math.random() * TAU,
-      ox: 0, oy: 0,
+      x: (Math.random() * 2 - 1) * 2.6, y: (Math.random() * 2 - 1) * 2, z: far ? Z1 - Math.random() * 1.5 : Z0 + Math.random() * (Z1 - Z0),
+      s: bokeh ? 0.05 + Math.random() * 0.06 : 0.012 + Math.random() * 0.016, bokeh,
+      vx: (Math.random() - 0.5) * 0.02, vy: -0.015 - Math.random() * 0.025, ph: Math.random() * TAU, tw: 0.25 + Math.random() * 0.4,
     };
   };
   function resize() {
@@ -85,139 +53,71 @@ export function initCarvedBg(canvas) {
     w = innerWidth; h = innerHeight;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    R = Math.max(w, h) * 0.62;
-    const n = Math.round(clamp((w * h) / 4200, 110, 240));
-    parts = Array.from({ length: n }, () => make(false));
-    if (!cx.x) { cx.x = w / 2; cx.y = h * 0.42; ptr.sx = cx.x; ptr.sy = cx.y; }
+    f = Math.max(w, h) * 0.55;
+    const n = Math.round(clamp((w * h) / 16000, 30, 80));
+    motes = Array.from({ length: n }, () => make(false));
   }
   resize();
   addEventListener('resize', resize);
 
-  // палець і курсор: пасивні слухачі, скрол і барабан не блокуються
-  const move = (x, y) => {
-    const now = performance.now();
-    const d = Math.hypot(x - ptr.x, y - ptr.y);
-    ptr.energy = Math.min(1.6, ptr.energy + d / 260);
-    ptr.x = x; ptr.y = y; ptr.on = 1; ptr.last = now;
-    if (!ptr.sx) { ptr.sx = x; ptr.sy = y; }
-    loop();
-  };
-  const burst = (x, y) => {
-    bursts.push({ x, y, t: 0, rot: Math.random() * TAU });
-    if (bursts.length > 6) bursts.shift();
-    ptr.energy = Math.min(1.6, ptr.energy + 0.6);
-  };
-  addEventListener('pointermove', (e) => move(e.clientX, e.clientY), { passive: true });
-  addEventListener('pointerdown', (e) => { move(e.clientX, e.clientY); burst(e.clientX, e.clientY); }, { passive: true });
-  addEventListener('touchmove', (e) => { const t = e.touches[0]; if (t) move(t.clientX, t.clientY); }, { passive: true });
-  addEventListener('touchend', () => { ptr.on = 0; }, { passive: true });
-  document.addEventListener('pointerleave', () => { ptr.on = 0; });
+  // делікатний паралакс: камера ледь нахиляється за пальцем / курсором
+  const aim = { x: 0, y: 0 }, cam = { x: 0, y: 0 };
+  const point = (x, y) => { aim.x = (x / w - 0.5) * 0.5; aim.y = (y / h - 0.5) * 0.35; };
+  addEventListener('pointermove', (e) => point(e.clientX, e.clientY), { passive: true });
+  addEventListener('touchmove', (e) => { const t = e.touches[0]; if (t) point(t.clientX, t.clientY); }, { passive: true });
 
-  let t = 0, rot = 0, lastScroll = scrollY;
+  const fogA = (z) => Math.exp(-(FOG * z) * (FOG * z));
+  let t = 0;
   function draw(dt) {
     t += dt;
-    const ds = scrollY - lastScroll; lastScroll = scrollY;
-    rot += dt * 0.12 + clamp(ds, -80, 80) * 0.0016; // прокрутка «підкручує» вихор
-    if (performance.now() - ptr.last > 1800) ptr.on = 0;
-    ptr.energy *= Math.pow(0.35, dt);
-    const en = ptr.energy;
+    cam.x += (aim.x + Math.sin(t * 0.05) * 0.08 - cam.x) * Math.min(1, dt * 0.9);
+    cam.y += (aim.y + Math.cos(t * 0.04) * 0.05 - cam.y) * Math.min(1, dt * 0.9);
+    const sy = scrollY * 0.0009; // при прокрутці глибина повільно «пропливає»
+    const cx = w / 2, cy = h / 2;
 
-    // центр: базова точка + легкий нахил до пальця
-    const bx = w / 2, by = h * 0.42;
-    const tx = ptr.on ? bx + (ptr.x - bx) * 0.22 : bx, ty = ptr.on ? by + (ptr.y - by) * 0.22 : by;
-    cx.x += (tx - cx.x) * Math.min(1, dt * 2.2); cx.y += (ty - cx.y) * Math.min(1, dt * 2.2);
-    ptr.sx += (ptr.x - ptr.sx) * Math.min(1, dt * 7); ptr.sy += (ptr.y - ptr.sy) * Math.min(1, dt * 7);
-
-    ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'lighter';
 
-    // м’яке сяйво в центрі вихору і під пальцем
-    const breathe = 1 + 0.04 * Math.sin(t * 0.9);
-    const hs = R * 1.1 * breathe;
-    ctx.globalAlpha = 0.55 + en * 0.15;
-    ctx.drawImage(HALO, cx.x - hs / 2, cx.y - hs / 2, hs, hs);
-    if (ptr.on) { const ps = 220 + en * 140; ctx.globalAlpha = 0.25 + en * 0.3; ctx.drawImage(HALO, ptr.sx - ps / 2, ptr.sy - ps / 2, ps, ps); }
-
-    // різьблені контури
-    ctx.save();
-    ctx.translate(cx.x, cx.y);
+    // тонкі 3D-контури в глибині
+    ctx.lineWidth = 1;
     ctx.lineJoin = 'round';
-    for (let i = 0; i < rings.length; i++) {
-      const rg = rings[i];
-      const s = R * rg.k * breathe * (1 + 0.02 * Math.sin(t * 1.3 + i));
-      ctx.save();
-      ctx.rotate(rot * rg.dir * (rg.sp / 0.05) + i * 0.2);
-      ctx.scale(s, s * 0.94);
-      ctx.lineWidth = 1.2 / s;
-      const shimmer = 0.5 + 0.5 * Math.sin(t * 1.1 - i * 0.9);
-      ctx.globalAlpha = rg.a * (0.7 + 0.6 * shimmer) * (1 + en * 0.8);
-      ctx.strokeStyle = i % 2 ? '#f5efe6' : '#e6b85c';
-      ctx.stroke(paths[i]);
-      ctx.restore();
-    }
-    ctx.save();
-    ctx.rotate(-rot * 0.6);
-    ctx.scale(R * 0.9, R * 0.9 * 0.94);
-    ctx.lineWidth = 1 / (R * 0.9);
-    ctx.globalAlpha = 0.05 + en * 0.05;
-    ctx.strokeStyle = '#e6b85c';
-    ctx.stroke(spokes);
-    ctx.restore();
-    ctx.restore();
-
-    // частинки, що затягує у воронку
-    const reach = 150 + en * 70;
-    for (const p of parts) {
-      p.r -= p.v * dt * (0.6 + p.r);
-      p.a += p.sp * dt * (0.6 + 1.6 * (1 - Math.min(1, p.r)));
-      if (p.r < 0.035) Object.assign(p, make(true));
-      const star = 0.8 + 0.2 * Math.cos(8 * (p.a - rot * 0.5)); // траєкторії складаються у восьмикутну зірку
-      const rr = p.r * R * star;
-      let x = cx.x + Math.cos(p.a + rot * 0.3) * rr;
-      let y = cx.y + Math.sin(p.a + rot * 0.3) * rr * 0.94;
-      // тягнуться за пальцем
-      let tox = 0, toy = 0, glow = 0;
-      if (ptr.on) {
-        const dx = ptr.sx - x, dy = ptr.sy - y, d = Math.hypot(dx, dy);
-        if (d < reach) {
-          const f = 1 - d / reach;
-          glow = f;
-          tox = dx * f * 0.45 - dy * f * 0.25; // притягування + легке закручування навколо пальця
-          toy = dy * f * 0.45 + dx * f * 0.25;
-        }
+    for (const sh of shapes) {
+      const rz = t * sh.vr, rx = sh.rx + Math.sin(t * 0.06) * 0.15, ry = sh.ry + t * sh.vr * 0.7;
+      const cz = Math.cos(rz), sz = Math.sin(rz), cxr = Math.cos(rx), sxr = Math.sin(rx), cyr = Math.cos(ry), syr = Math.sin(ry);
+      const proj = (px, py) => {
+        let x = px * sh.s, y = py * sh.s, z = 0;
+        [x, y] = [x * cz - y * sz, x * sz + y * cz];
+        [y, z] = [y * cxr - z * sxr, y * sxr + z * cxr];
+        [x, z] = [x * cyr + z * syr, -x * syr + z * cyr];
+        const Z = sh.z + z, k = f / Z;
+        return [cx + (sh.x + x - cam.x * Z * 0.12) * k, cy + (sh.y + y - sy * 0.4 - cam.y * Z * 0.12) * k];
+      };
+      ctx.globalAlpha = sh.a * fogA(sh.z) * (0.75 + 0.25 * Math.sin(t * 0.3 + sh.z));
+      ctx.strokeStyle = '#e6b85c';
+      for (const pts of [STAR, RING]) {
+        ctx.beginPath();
+        pts.forEach(([px, py], i) => { const [X, Y] = proj(px, py); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
+        ctx.closePath();
+        ctx.stroke();
       }
-      p.ox += (tox - p.ox) * Math.min(1, dt * 5);
-      p.oy += (toy - p.oy) * Math.min(1, dt * 5);
-      x += p.ox; y += p.oy;
-      if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue;
-      const fade = Math.min(1, p.r * 6) * Math.min(1, (1.25 - p.r) * 4);
-      const tw = 0.55 + 0.45 * Math.sin(t * p.tw + p.ph);
-      ctx.globalAlpha = clamp((0.28 + 0.5 * tw + glow * 0.8) * fade, 0, 1);
-      const s = p.s * (1 + glow * 1.2);
-      ctx.drawImage(p.img, x - s * 2, y - s * 2, s * 4, s * 4);
     }
 
-    // кільця-сніжинки від дотику
-    for (let i = bursts.length - 1; i >= 0; i--) {
-      const b = bursts[i];
-      b.t += dt;
-      const k = b.t / 1.3;
-      if (k >= 1) { bursts.splice(i, 1); continue; }
-      const s = 20 + 170 * (1 - Math.pow(1 - k, 3));
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(b.rot + k * 0.8);
-      ctx.scale(s, s);
-      ctx.lineWidth = 1.5 / s;
-      ctx.globalAlpha = 0.55 * (1 - k);
-      ctx.strokeStyle = '#ffe2a6';
-      ctx.stroke(paths[0]);
-      ctx.globalAlpha = 0.35 * (1 - k);
-      ctx.scale(0.55, 0.55);
-      ctx.lineWidth = 1.5 / (s * 0.55);
-      ctx.stroke(paths[1]);
-      ctx.restore();
+    // пилинки й боке
+    for (const p of motes) {
+      p.x += (p.vx + Math.sin(t * 0.2 + p.ph) * 0.01) * dt;
+      p.y += p.vy * dt;
+      p.z -= 0.04 * dt; // дуже повільно пливуть до глядача
+      if (p.z < Z0 || p.y < -2.4) Object.assign(p, make(p.z < Z0));
+      let wy = ((p.y - sy - cam.y * p.z * 0.12 + 2.2) % 4.4 + 4.4) % 4.4 - 2.2;
+      const k = f / p.z;
+      const X = cx + (p.x - cam.x * p.z * 0.12) * k, Y = cy + wy * k;
+      const r = Math.max(1.2, p.s * k);
+      if (X < -r || X > w + r || Y < -r || Y > h + r) continue;
+      const near = clamp((3 - p.z) / 1.8, 0, 1); // ближні — більші, розмитіші й прозоріші
+      const a = (p.bokeh ? 0.22 : 0.3) * fogA(p.z) * (1 - near * 0.6) * (0.65 + 0.35 * Math.sin(t * p.tw + p.ph));
+      if (a < 0.01) continue;
+      ctx.globalAlpha = a;
+      ctx.drawImage(p.bokeh ? BOKEH : DUST, X - r, Y - r, r * 2, r * 2);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
