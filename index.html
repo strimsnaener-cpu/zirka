@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#140d0a">
+  <title>Зірка оживає — Lava Aroma Candles</title>
+  <meta name="description" content="Lava Aroma Candles: обери узор, приміряй кольори в 3D і розпиши свою зірку.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cpath d='M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z' fill='%23E6B85C'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
+</head>
+<body>
+  <div class="glow-bg" aria-hidden="true"></div>
+  <canvas class="sparks" id="bgfx" aria-hidden="true"></canvas>
+
+  <header class="topbar">
+    <a class="brand" href="#showcase" data-go="showcase">
+      <svg class="brand-mark" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z"/></svg>
+      <span><b>Lava Aroma Candles</b><small>Зірка оживає</small></span>
+    </a>
+    <div class="top-r">
+      <button class="btn btn-ghost btn-sm top-home" data-go="showcase">← На головну</button>
+      <button class="music-btn" id="musicBtn" aria-pressed="false" aria-label="Увімкнути колядки">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+        <span class="music-t">Колядки</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- МАЙСТЕРНЯ ПІСЛЯ QR: вітання → узор (барабан) → кольори в 3D → розпис -->
+    <section id="view-showcase" class="view" data-view="showcase">
+
+      <!-- Вітання -->
+      <section class="hx" id="offer" data-sec>
+        <h1 class="hx-title">Зірка <em>оживає</em></h1>
+        <p class="hx-lead">Обери узор. Приміряй кольори. Малюй.</p>
+        <button class="btn btn-gold btn-lg hx-go" data-scroll="ideas">Почати <span aria-hidden="true">↓</span></button>
+      </section>
+
+      <!-- Крок 1 · барабан узорів -->
+      <section class="sec" id="ideas" data-sec>
+        <div class="ghost-wrap" aria-hidden="true"><div class="ghost" data-ghost>Різдво</div></div>
+        <p class="tag">Крок 1</p>
+        <h2 class="h-xl">Обери <em>узор</em></h2>
+        <p class="sec-lead">Гортай і тисни на картку</p>
+        <div class="drum" id="drum" aria-roledescription="карусель" aria-label="Узори розпису. Гортайте пальцем або мишкою.">
+          <div class="drum-ring" id="drumRing"></div>
+        </div>
+        <div class="drum-bar">
+          <button class="round-btn" data-drum="-1" aria-label="Попередній узор">←</button>
+          <div class="drum-info" id="drumInfo" aria-live="polite"></div>
+          <button class="round-btn" data-drum="1" aria-label="Наступний узор">→</button>
+        </div>
+      </section>
+
+      <!-- Крок 2 · кольори в 3D -->
+      <section class="sec" id="try" data-sec>
+        <div class="ghost-wrap" aria-hidden="true"><div class="ghost" data-ghost>Майстерня</div></div>
+        <p class="tag">Крок 2</p>
+        <h2 class="h-xl">Приміряй <em>кольори</em></h2>
+        <div class="try">
+          <div class="viewer-card">
+            <div class="viewer" id="viewer3d" aria-label="3D-модель зірки на підставці. Крутіть пальцем або мишкою на 360°.">
+              <div class="viewer-loading">Запалюємо зірку…</div>
+            </div>
+            <div class="viewer-ui">
+              <div class="seg seg-sm" role="group" aria-label="Ракурс">
+                <button data-view3d="front" class="is-on">Спереду</button>
+                <button data-view3d="side">Збоку</button>
+                <button data-view3d="stand">Село</button>
+              </div>
+            </div>
+            <div class="viewer-ui viewer-ui-b">
+              <div class="seg seg-sm" role="group" aria-label="Що показати">
+                <button data-look="painted" class="is-on">Розпис</button>
+                <button data-look="kit">Заготовка</button>
+              </div>
+              <button class="icon-btn" id="autoRotateBtn" aria-pressed="true" aria-label="Зупинити обертання">⏸</button>
+            </div>
+          </div>
+          <div class="try-panel" id="tryPanel"></div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <div class="ghost-wrap" aria-hidden="true"><div class="ghost ghost-sm" data-ghost>Lava Aroma Candles</div></div>
+        <svg class="foot-mark" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z"/></svg>
+        <p class="foot-wish">Світлого Різдва ✨</p>
+        <p>Lava Aroma Candles · <b>#ЗіркаОживає</b></p>
+      </footer>
+    </section>
+
+
+    <!-- 2. Майстерня -->
+    <section id="view-workshop" class="view" data-view="workshop" hidden>
+      <div class="ws-bar">
+        <div class="seg" role="group" aria-label="Об’єкт">
+          <button data-object="star" class="is-on">Моя зірка</button>
+          <button data-object="village">Моє різдвяне село</button>
+        </div>
+        <div class="seg" role="group" aria-label="Режим">
+          <button data-mode="create" class="is-on">Створюю</button>
+          <button data-mode="paint">Крок за кроком</button>
+        </div>
+      </div>
+
+      <div class="ws-grid">
+        <div class="stage-col">
+          <div class="stage-card">
+            <div class="stage" id="stage"></div>
+            <div class="stage3d" id="stage3d" hidden aria-label="Розпис на 3D-моделі. Крутіть пальцем або мишкою."></div>
+            <div class="stage-tools">
+              <button class="icon-btn icon-3d" data-stage3d aria-pressed="false" aria-label="Показати розпис на 3D-моделі">3D</button>
+              <button class="icon-btn" data-zoom="in" aria-label="Збільшити">+</button>
+              <button class="icon-btn" data-zoom="out" aria-label="Зменшити">−</button>
+              <button class="icon-btn" data-zoom="reset" aria-label="Весь виріб">⤢</button>
+            </div>
+            <div class="stage-chip" id="stageChip"></div>
+          </div>
+          <div class="dock" id="dock"></div>
+        </div>
+        <div class="panel" id="panel"></div>
+      </div>
+    </section>
+
+    <!-- 3. Фінал -->
+    <section id="view-finish" class="view" data-view="finish" hidden>
+      <div class="finish">
+        <div class="finish-copy">
+          <p class="eyebrow">Готово</p>
+          <h2 class="h-big">Твоя зірка <em>засяяла</em></h2>
+          <p class="lead" id="finishText"></p>
+          <div class="finish-actions">
+            <button class="btn btn-gold btn-lg" id="saveBtn">Зберегти фото</button>
+            <button class="btn btn-ghost" id="shareBtn" hidden>Поділитися</button>
+            <button class="btn btn-ghost" data-scroll="try" data-look-go="painted">У 3D</button>
+            <button class="btn btn-ghost" data-go="workshop" data-mode="create">Змінити</button>
+          </div>
+          <p class="tiny">Для сторіз · <b>#ЗіркаОживає</b></p>
+        </div>
+        <div class="finish-preview" id="finishPreview"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 3. Плеєр колядок -->
+  <aside class="player" id="player" aria-label="Різдвяна музика"></aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

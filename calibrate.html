@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калібрування контуру зірки — Lava Aroma Candles</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b1424; color: #f3eddc; font: 14px/1.5 system-ui, sans-serif; }
+  .wrap { display: grid; gap: 16px; padding: 16px; max-width: 1100px; margin: auto; }
+  @media (min-width: 860px) { .wrap { grid-template-columns: 1fr 340px; } }
+  .stage { position: relative; aspect-ratio: 1; background: #222 repeating-conic-gradient(#2a2a2a 0 25%, #202020 0 50%) 0 0 / 24px 24px; border-radius: 14px; overflow: hidden; }
+  .stage img { position: absolute; left: 50%; top: 50%; transform-origin: center; max-width: none; opacity: .95; }
+  .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  label { display: grid; grid-template-columns: 1fr 64px; gap: 4px 10px; align-items: center; margin: 8px 0; font-size: 13px; }
+  label input[type=range] { grid-column: 1 / -1; width: 100%; }
+  output { text-align: right; font-variant-numeric: tabular-nums; color: #f2d97c; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 18px 0 2px; color: #d4af37; }
+  pre { background: #050a14; padding: 12px; border-radius: 10px; white-space: pre-wrap; font-size: 12.5px; }
+  button, .file { background: #d4af37; color: #1d1606; border: 0; border-radius: 999px; padding: 9px 16px; font-weight: 700; cursor: pointer; }
+  .muted { color: #a9a290; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="stage" id="stage"><img id="photo" alt=""><svg id="ov" viewBox="-110 -110 220 220"></svg></div>
+    <p class="muted">Покладіть фронтальне фото зірки (знімайте строго спереду, без перспективи). Спершу сумістіть фото з колом «кінчиків» (масштаб/зсув/поворот фото), потім підженіть форму зірки.</p>
+  </div>
+  <div>
+    <h1>Калібрування контуру</h1>
+    <p class="muted">Результат вставте в <code>js/config.js</code> → <code>STAR</code>. Усе — і SVG, і 3D — перебудується автоматично.</p>
+    <label class="file">Обрати фото… <input type="file" id="file" accept="image/*" hidden></label>
+    <select id="refs" style="margin-left:8px;padding:8px;border-radius:10px"><option value="">Референси з config.js…</option></select>
+    <h2>Фото</h2>
+    <div id="photoCtl"></div>
+    <h2>Форма зірки</h2>
+    <div id="starCtl"></div>
+    <h2>Для config.js</h2>
+    <pre id="out"></pre>
+    <button id="copy">Скопіювати</button>
+  </div>
+</div>
+<script type="module">
+import { STAR, ASSETS } from './js/config.js';
+const P = { scale: 1, x: 0, y: 0, rot: 0 };
+const S = { innerRatio: STAR.innerRatio, ringR: STAR.ringR, hubR: STAR.hubR, openingHalfDeg: STAR.openingHalfDeg, rotateDeg: STAR.rotateDeg };
+const photoCtl = [['scale', 'Масштаб фото', 0.3, 3, 0.005], ['x', 'Зсув X', -150, 150, 0.2], ['y', 'Зсув Y', -150, 150, 0.2], ['rot', 'Поворот фото, °', -45, 45, 0.1]];
+const starCtl = [['innerRatio', 'Западини / радіус', 0.3, 0.8, 0.005], ['ringR', 'Радіус кола-вікна', 20, 60, 0.2], ['hubR', 'Вершини прорізів (до центру)', 5, 40, 0.2], ['openingHalfDeg', 'Ширина прорізу, °', 8, 22, 0.1], ['rotateDeg', 'Поворот зірки, °', -22.5, 22.5, 0.1]];
+const rad = (d) => d * Math.PI / 180, pol = (r, a) => [r * Math.cos(rad(a)), r * Math.sin(rad(a))];
+const f = (p) => p.map((v) => v.toFixed(2)).join(' ');
+function draw() {
+  const R = 100, ri = R * S.innerRatio, pts = [];
+  for (let k = 0; k < 8; k++) { const a = -90 + 45 * k + S.rotateDeg; pts.push(pol(R, a), pol(ri, a + 22.5)); }
+  let d = 'M' + pts.map(f).join('L') + 'Z';
+  for (let k = 0; k < 8; k++) {
+    const phi = -67.5 + 45 * k + S.rotateDeg, h = S.openingHalfDeg;
+    d += `M${f(pol(S.hubR, phi))}L${f(pol(S.ringR, phi - h))}A${S.ringR} ${S.ringR} 0 0 1 ${f(pol(S.ringR, phi + h))}Z`;
+  }
+  document.getElementById('ov').innerHTML = `<circle r="100" fill="none" stroke="#5cf" stroke-width=".4" stroke-dasharray="2 2"/><circle r="${S.ringR}" fill="none" stroke="#5cf" stroke-width=".3"/><path d="${d}" fill="#f2d97c22" fill-rule="evenodd" stroke="#ff3b6b" stroke-width=".7"/><path d="M0-108V108M-108 0H108" stroke="#5cf5" stroke-width=".3"/>`;
+  const img = document.getElementById('photo'), st = document.getElementById('stage');
+  if (img.naturalWidth) {
+    const base = st.clientWidth * (200 / 220) / Math.max(img.naturalWidth, img.naturalHeight);
+    img.style.width = img.naturalWidth * base + 'px';
+    img.style.transform = `translate(-50%,-50%) translate(${P.x * st.clientWidth / 220}px, ${P.y * st.clientWidth / 220}px) rotate(${P.rot}deg) scale(${P.scale})`;
+  }
+  document.getElementById('out').textContent = `innerRatio: ${S.innerRatio.toFixed(3)},\nringR: ${S.ringR.toFixed(1)},\nhubR: ${S.hubR.toFixed(1)},\nopeningHalfDeg: ${S.openingHalfDeg.toFixed(1)},\nrotateDeg: ${S.rotateDeg.toFixed(1)},`;
+}
+function controls(el, list, obj) {
+  el.innerHTML = list.map(([k, t, mn, mx, st]) => `<label>${t}<output id="o-${k}">${obj[k]}</output><input type="range" data-k="${k}" min="${mn}" max="${mx}" step="${st}" value="${obj[k]}"></label>`).join('');
+  el.addEventListener('input', (e) => { const k = e.target.dataset.k; obj[k] = +e.target.value; document.getElementById('o-' + k).textContent = obj[k]; draw(); });
+}
+controls(document.getElementById('photoCtl'), photoCtl, P);
+controls(document.getElementById('starCtl'), starCtl, S);
+const img = document.getElementById('photo');
+img.onload = draw;
+img.src = 'assets/star-front.png';
+img.onerror = () => { if (!img.src.includes('kit-raw-wood')) img.src = 'assets/photos/kit-raw-wood.webp'; };
+const refs = document.getElementById('refs');
+for (const r of ASSETS.references || []) refs.insertAdjacentHTML('beforeend', `<option value="${r.src}">${r.view}: ${r.note}</option>`);
+refs.onchange = () => { if (refs.value) img.src = refs.value; };
+document.getElementById('file').onchange = (e) => { const fl = e.target.files[0]; if (fl) img.src = URL.createObjectURL(fl); };
+document.getElementById('copy').onclick = () => navigator.clipboard?.writeText(document.getElementById('out').textContent);
+addEventListener('resize', draw);
+draw();
+</script>
+</body>
+</html>
