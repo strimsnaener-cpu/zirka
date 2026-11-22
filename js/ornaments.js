@@ -5,7 +5,7 @@
    layer: base | outline | ornament | fine | gold  — визначає крок розпису.
    order: послідовність кроків (залежить від технології: світла чи темна основа).
    dry:   хвилини висихання ПІСЛЯ кроку. */
-import { STAR } from './config.js';
+import { STAR, PAINTED_PHOTOS } from './config.js';
 import {
   starOutlineD, openingsD, circleD, tipHalfD, bandD, halfW, RING, n,
   petal, leaf, dot, spark, star8, line, mirror,
@@ -507,6 +507,8 @@ const pysanka = {
 
 export const DESIGNS = [rays, stripes, triangles, podillia, hutsul, kalyna, kolosky, zirochky, ruzha, pavuk, vyshyvanka, petrykivka, moroz, merezhyvo, kosiv, hrona, pysanka];
 export const DESIGN = Object.fromEntries(DESIGNS.map((d) => [d.id, d]));
+// realPhotoUrl — справжнє фото розписаної зірки (може ще не існувати — тоді показуємо превʼю)
+DESIGNS.forEach((d, i) => { d.realPhotoUrl = `${PAINTED_PHOTOS.dir}${PAINTED_PHOTOS.prefix}${i + 1}.${PAINTED_PHOTOS.ext}`; });
 for (const d of DESIGNS) d.bare = { fill: 'wood', layers: ['base'] };
 
 /* Пресети кольорів — перестановки 5 фарб (щоб лишалися лише фарби набору) */

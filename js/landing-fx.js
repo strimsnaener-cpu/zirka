@@ -4,6 +4,7 @@
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2;
+const MOBILE = matchMedia('(max-width: 768px), (pointer: coarse)').matches;
 
 /* ---------- 1. Ambient 3D: «є, але не заважає» ---------- */
 export function initAmbientBg(canvas) {
@@ -49,16 +50,19 @@ export function initAmbientBg(canvas) {
     };
   };
   function resize() {
-    dpr = Math.min(devicePixelRatio || 1, 1.5);
+    dpr = MOBILE ? 1 : Math.min(devicePixelRatio || 1, 1.5); // м’якому фону зайві пікселі не потрібні
     w = innerWidth; h = innerHeight;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     f = Math.max(w, h) * 0.55;
-    const n = Math.round(clamp((w * h) / 16000, 30, 80));
+    const n = MOBILE ? 12 : Math.round(clamp((w * h) / 16000, 30, 80)); // на телефоні — у 2–3 рази менше
     motes = Array.from({ length: n }, () => make(false));
   }
+  if (MOBILE) shapes.length = 2;
   resize();
-  addEventListener('resize', resize);
+  // на телефоні resize спрацьовує від адресного рядка — перебудовуємо лише при зміні ширини
+  let lastW = innerWidth;
+  addEventListener('resize', () => { if (!MOBILE || innerWidth !== lastW) { lastW = innerWidth; resize(); } else { h = innerHeight; canvas.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); } });
 
   // делікатний паралакс: камера ледь нахиляється за пальцем / курсором
   const aim = { x: 0, y: 0 }, cam = { x: 0, y: 0 };
@@ -124,9 +128,10 @@ export function initAmbientBg(canvas) {
   }
 
   let last = performance.now(), raf = 0;
+  const minStep = MOBILE ? 1000 / 30 - 2 : 0;
   function frame(now) {
     raf = 0;
-    draw(Math.min(0.05, (now - last) / 1000)); last = now;
+    if (now - last >= minStep) { draw(Math.min(0.08, (now - last) / 1000)); last = now; }
     loop();
   }
   function loop() {
@@ -183,6 +188,8 @@ export function initDrum(drum, ring, { render, onActive, onOpen }) {
 
   drum.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    // біля самого краю екрана — системний жест «Назад», карусель його не перехоплює
+    if (e.pointerType === 'touch' && (e.clientX < 20 || e.clientX > innerWidth - 20)) return;
     drag = { x: e.clientX, t: performance.now(), moved: 0, card: e.target.closest('.dc'), id: e.pointerId, cap: false };
     vel = 0;
     drum.classList.add('is-drag');

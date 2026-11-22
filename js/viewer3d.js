@@ -37,6 +37,20 @@ const STAR_Z = STICK_Z + STK.thicknessCm / 2 + T / 2 + 0.01;
 
 /* «технічні» кольори для карти металу: B = металевість, G = шорсткість */
 const METAL = '#0073D9', PLAIN = '#00FF00';
+/* телефон / слабкий пристрій: менше пікселів, без динамічних тіней, менше снігу */
+const MOBILE = matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+const LOW = MOBILE || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+const TEX = LOW ? 768 : 1024;
+
+/** м’яка «запечена» тінь під підставкою — замість карти тіней на слабких пристроях */
+function blobShadowTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(0,0,0,.55)'); gr.addColorStop(0.55, 'rgba(0,0,0,.25)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return canvasTex(c);
+}
 
 /* ---------- текстури ---------- */
 function canvasTex(canvas) {
@@ -216,12 +230,12 @@ export class Viewer {
   }
 
   async init() {
-    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' }));
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: LOW ? 'default' : 'high-performance' }));
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, MOBILE ? 1.25 : 1.5));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
-    r.shadowMap.enabled = true;
+    r.shadowMap.enabled = !LOW;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.host.innerHTML = '';
     this.host.appendChild(r.domElement);
@@ -232,17 +246,22 @@ export class Viewer {
     scene.add(new THREE.HemisphereLight(0xc9dcff, 0x3a2614, 0.9));
     const key = new THREE.DirectionalLight(0xfff0d8, 2.6);
     key.position.set(8, 20, 22);
-    key.castShadow = true;
+    key.castShadow = !LOW;
     key.shadow.mapSize.set(1024, 1024);
     Object.assign(key.shadow.camera, { left: -16, right: 16, top: 30, bottom: -4, near: 1, far: 70 });
     key.shadow.bias = -0.0006;
     key.shadow.normalBias = 0.02;
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9cc2ff, 1.3); rim.position.set(-12, 14, -14); scene.add(rim);
+    if (!LOW) { const rim = new THREE.DirectionalLight(0x9cc2ff, 1.3); rim.position.set(-12, 14, -14); scene.add(rim); }
     const candle = new THREE.PointLight(0xffa860, 60, 40, 2); candle.position.set(0, 7, 10); scene.add(candle);
 
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.ShadowMaterial({ opacity: 0.4 }));
-    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    if (!LOW) {
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.ShadowMaterial({ opacity: 0.4 }));
+      floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    } else {
+      const blob = new THREE.Mesh(new THREE.PlaneGeometry(30, 16), new THREE.MeshBasicMaterial({ map: blobShadowTex(), transparent: true, depthWrite: false }));
+      blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; scene.add(blob);
+    }
 
     /* ----- фото й текстури (кожне — необов’язкове) ----- */
     const X = ASSETS.textures || {};
@@ -334,7 +353,7 @@ export class Viewer {
     } else this.kitVillage = pv;
 
     /* ----- сніжинки ----- */
-    const N = 170, pos = new Float32Array(N * 3);
+    const N = LOW ? 60 : 170, pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 50; pos[i * 3 + 1] = Math.random() * 42; pos[i * 3 + 2] = (Math.random() - 0.5) * 30 - 4; }
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.snow = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.42, map: dotTex(), transparent: true, depthWrite: false, opacity: 0.55, color: 0xfff1dc }));
@@ -362,6 +381,10 @@ export class Viewer {
     this.resize();
     this.clock = new THREE.Clock();
     this.loop = this.loop.bind(this);
+    this.raf = 0;
+    // вкладку згорнули — рендер стоїть; повернулися — продовжує
+    this.onVis = () => { if (!document.hidden && this.active) this.kick(); };
+    document.addEventListener('visibilitychange', this.onVis);
     this.ready = true;
     this.applyLook();
   }
@@ -390,7 +413,7 @@ export class Viewer {
     const sc = state.star.colors, vc = state.village.colors;
     const sGold = hasGold(d, sc) && (!starLayers || [...starLayers].length), vGold = hasGold(VILLAGE, vc);
     const [star, starM, vil, vilM] = await Promise.all([
-      rasterize(starOnly(state.star.designId, sc, { idp: 'tx', bare: true, layers: starLayers }), 1024, 1024, '#E2C08B'),
+      rasterize(starOnly(state.star.designId, sc, { idp: 'tx', bare: true, layers: starLayers }), TEX, TEX, '#E2C08B'),
       sGold ? rasterize(metalSvg(starOnly(state.star.designId, metalColors(d, sc), { idp: 'tm', bare: false, layers: starLayers })), 512, 512, PLAIN) : null,
       rasterize(villageOnly(vc, { idp: 'vx', bare: true, layers: villageLayers }), VW * VS, VILLAGE_H * VS, VILLAGE.bare.fill),
       vGold ? rasterize(metalSvg(villageOnly(metalColors(VILLAGE, vc), { idp: 'vm', bare: false, layers: villageLayers })), VW * 2, VILLAGE_H * 2, PLAIN) : null,
@@ -449,13 +472,39 @@ export class Viewer {
   }
 
   setActive(on) {
-    if (on === this.active) return;
-    this.active = on;
-    if (on && this.clock) { this.clock.getDelta(); requestAnimationFrame(this.loop); }
+    this.active = on; // повторний виклик безпечний: kick() не запустить другий цикл
+    if (on) this.kick();
+    else if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; }
+  }
+  kick() {
+    if (!this.clock || this.raf || document.hidden) return;
+    this.clock.getDelta();
+    this.raf = requestAnimationFrame(this.loop);
+  }
+
+  /** повне звільнення пам’яті GPU (геометрії, матеріали, текстури, рендерер) */
+  dispose() {
+    this.setActive(false);
+    document.removeEventListener('visibilitychange', this.onVis);
+    this.ro?.disconnect();
+    this.controls?.dispose();
+    Object.values(this.tex).forEach((t) => t?.dispose());
+    this.scene?.traverse((o) => {
+      o.geometry?.dispose();
+      [].concat(o.material || []).forEach((m) => {
+        Object.values(m).forEach((v) => v?.isTexture && v.dispose());
+        m.dispose();
+      });
+    });
+    this.renderer?.dispose();
+    this.renderer?.forceContextLoss?.();
+    this.renderer?.domElement.remove();
+    this.ready = false;
   }
 
   loop() {
-    if (!this.active) return;
+    this.raf = 0;
+    if (!this.active || document.hidden) return;
     const dt = Math.min(0.05, this.clock.getDelta());
     this.t += dt;
     const tw = this.tween;
@@ -480,6 +529,6 @@ export class Viewer {
     }
     p.needsUpdate = true;
     this.renderer.render(this.scene, this.camera);
-    requestAnimationFrame(this.loop);
+    this.raf = requestAnimationFrame(this.loop);
   }
 }

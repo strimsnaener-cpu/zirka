@@ -78,7 +78,7 @@ function attachShowcase() {
     v.setLook(state.look);
     v.setView(showView, true);
     refresh3d(0);
-    v.setActive(true);
+    v.setActive(tryInView);
   });
 }
 
@@ -187,13 +187,33 @@ function applyDesign(id) {
   setLook('painted');
 }
 
+// справжні фото розписаних зірок: перевіряємо тихо (без «битих» картинок) і лише для карток поруч
+const photoOk = new Map(); // id → true | false | 'loading'
+const artHtml = (d) => (photoOk.get(d.id) === true
+  ? `<div class="dc-art is-photo"><img src="${d.realPhotoUrl}" alt="${esc(d.title)} — розписано вручну" draggable="false"><span class="dc-real">Фото</span></div>`
+  : `<div class="dc-art"><img src="${svgUrl(starHandmade(d.id, presetColors(d, 'classic'), { idp: 'hm', seed: 3 + (d.id.length % 7) }))}" alt="" draggable="false"></div>`);
+function probePhoto(d) {
+  if (!d?.realPhotoUrl || photoOk.has(d.id)) return;
+  photoOk.set(d.id, 'loading');
+  const im = new Image();
+  im.decoding = 'async';
+  im.onload = () => {
+    photoOk.set(d.id, true);
+    document.querySelectorAll(`.dc[data-id="${d.id}"] .dc-art`).forEach((a) => (a.outerHTML = artHtml(d)));
+  };
+  im.onerror = () => photoOk.set(d.id, false);
+  im.src = d.realPhotoUrl;
+}
+
 // Крок 1 · барабан узорів
 const drum = initDrum($('#drum'), $('#drumRing'), {
   render: (d) => `<div class="dc" data-id="${d.id}">
-      <div class="dc-art"><img src="${svgUrl(starHandmade(d.id, presetColors(d, 'classic'), { idp: 'hm', seed: 3 + (d.id.length % 7) }))}" alt="" draggable="false"></div>
+      ${artHtml(d)}
       <div class="dc-meta"><b>${esc(d.title)}</b><small>${esc(d.origin || levelTitle(d.level))}</small></div>
       <span class="dc-open" aria-hidden="true">Обрати</span></div>`,
   onActive: (d) => {
+    const i = DESIGNS.indexOf(d), n = DESIGNS.length;
+    for (let k = -2; k <= 2; k++) probePhoto(DESIGNS[(i + k + n) % n]);
     $('#drumInfo').innerHTML = `<b>${esc(d.title)}</b><button class="btn btn-gold btn-sm" data-try="${d.id}">Обрати ↓</button>`;
   },
   onOpen: (d) => tryDesign(d.id),
@@ -254,10 +274,17 @@ document.addEventListener('click', (e) => {
 });
 
 // 3D на головній вантажиться лише коли користувач догортав до примірки (швидкий старт на мобільному)
-let tryVisible = false;
+// заздалегідь (за 400px) — вантажимо; рендеримо — лише поки 3D-блок справді на екрані
+let tryVisible = false, tryInView = false;
 if ('IntersectionObserver' in window) {
   new IntersectionObserver(([en]) => { tryVisible = en.isIntersecting; attachShowcase(); }, { rootMargin: '400px 0px' }).observe($('#try'));
-} else tryVisible = true;
+  new IntersectionObserver(([en]) => {
+    tryInView = en.isIntersecting;
+    if (state.view === 'showcase' && viewer) viewer.setActive(tryInView);
+  }).observe($('#viewer3d'));
+} else tryVisible = tryInView = true;
+// сторінку закрили — звільняємо пам’ять GPU (але не при поверненні «Назад» із кешу)
+addEventListener('pagehide', (e) => { if (!e.persisted) viewer?.dispose(); });
 
 // фон і скрол-ефекти
 initAmbientBg($('#bgfx'));

@@ -395,3 +395,83 @@ body:not([data-view="showcase"]) .sparks { opacity: .4; }
 /* ---- превʼю «розписано вручну» ---- */
 .dc-art { background: radial-gradient(80% 70% at 32% 22%, #5a3f2b 0%, #2c1f17 55%, #1a120d 100%); }
 .dc-art img { width: 90%; height: auto; aspect-ratio: 416 / 424; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+
+/* ==========================================================================
+   ТЕЛЕФОН (≤768px): швидкість + зручність великим пальцем.
+   Десктоп (≥769px) цей блок не зачіпає.
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* --- швидкість: без backdrop-filter (дуже важкий для мобільних GPU) --- */
+  .topbar { background: rgba(20, 13, 10, .92); }
+  .topbar, .btn-ghost, .btn-glass, .seg, .icon-btn, .dock, .player { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .btn-ghost, .btn-glass { background: rgba(38, 26, 20, .92); }
+  .seg, .icon-btn { background: rgba(20, 13, 10, .92); }
+  .player { background: rgba(20, 13, 10, .95); }
+  .sparks { width: 100%; height: 100dvh; }
+  /* анімації лише transform / opacity */
+  .comp .slot.is-selected { animation: selPulseM 1.6s ease-in-out infinite; }
+  @keyframes selPulseM { 50% { opacity: .72; } }
+  .player .eq i { height: 14px; transform-origin: bottom; animation-name: eqM; }
+  @keyframes eqM { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+
+  /* --- жести: сторінка гортається лише вертикально; 3D крутиться пальцем без «стрибків» --- */
+  html { overscroll-behavior-x: none; }
+  main { touch-action: pan-y; }
+  #viewer3d, #viewer3d canvas, .stage3d, .stage3d canvas { touch-action: none; }
+  .drum { touch-action: pan-y; }
+
+  /* --- великі цілі для пальця: мінімум 48×48, проміжки 10–12px --- */
+  .btn, .btn-sm { min-height: 48px; }
+  .icon-btn { width: 48px; height: 48px; }
+  .music-btn { height: 48px; min-width: 48px; }
+  .seg { gap: 6px; padding: 4px; }
+  .seg button, .seg-sm button { min-height: 48px; padding: 0 16px; font-size: 14px; }
+  .viewer-ui-b { gap: 10px; }
+  .linklike { min-height: 48px; display: inline-flex; align-items: center; }
+  .parts, .presets, .chips, .row { gap: 10px; }
+  .parts button, .presets button { min-height: 48px; padding: 0 16px 0 12px; }
+  .presets button { padding: 0 18px; }
+  .paints { gap: 10px; }
+  .paint { min-height: 48px; }
+  .paint i { min-width: 48px; max-width: 58px; }
+  .drum-bar { gap: 14px; }
+  .chip { min-height: 48px; padding: 0 16px 0 12px; font-size: 14px; }
+  .chip.plain { padding: 0 16px; }
+  .chip .sw { width: 22px; height: 22px; }
+  .levels { gap: 10px; }
+  .levels button { min-height: 52px; }
+  .cards { gap: 10px; }
+  .palette { gap: 10px; }
+  .pot { min-height: 48px; }
+  .nav-steps { gap: 10px; }
+  .nav-steps .btn { min-height: 48px; font-size: 13px; }
+  .stage-tools { gap: 10px; }
+  .toggle { min-height: 48px; }
+  .player .play { width: 48px; height: 48px; }
+  .player .pbtn { width: 48px; height: 48px; }
+  .player-list button { min-height: 48px; }
+  /* м’який відгук на дотик */
+  .btn, .round-btn, .icon-btn, .music-btn, .seg button, .parts button, .presets button, .paint, .chip, .pot, .card, .levels button, .player button, .linklike { transition: transform .12s ease, background .2s, border-color .2s, box-shadow .2s; }
+  .btn:active, .round-btn:active, .icon-btn:active, .music-btn:active, .seg button:active, .parts button:active, .presets button:active,
+  .paint:active, .chip:active, .pot:active, .card:active, .levels button:active, .player button:active, .linklike:active { transform: scale(.95); }
+
+  /* --- «Приміряй кольори»: зірка лишається вгорі, панель фарб — під великим пальцем --- */
+  .try .viewer-card { position: sticky; top: var(--topbar); z-index: 3; }
+  .viewer { aspect-ratio: auto; height: 44dvh; max-height: none; }
+
+  /* --- майстерня: фарби й кнопки кроків — у нижній зоні екрана, над адресним рядком --- */
+  .stage { height: min(42dvh, 400px); }
+  body[data-view="workshop"] .dock { position: fixed; left: 8px; right: 8px; bottom: calc(8px + var(--safe-b)); z-index: 25; margin: 0;
+    background: rgba(20, 13, 10, .95); box-shadow: 0 -12px 30px rgba(0, 0, 0, .45); padding: 10px 12px; }
+  body[data-view="workshop"].has-player .dock { bottom: calc(var(--player) + 18px + var(--safe-b)); }
+  body[data-view="workshop"] .panel { padding-bottom: 170px; }
+  body[data-view="workshop"] .toast { bottom: calc(160px + var(--safe-b)); }
+  body[data-view="workshop"].has-player .toast { bottom: calc(var(--player) + 170px + var(--safe-b)); }
+}
+@media (max-width: 768px) and (max-height: 700px) { .stage { height: 36dvh; } .viewer { height: 40dvh; } }
+
+/* справжнє фото розписаної зірки в картці барабана */
+.dc-art.is-photo img { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; }
+.dc-real { position: absolute; left: 10px; bottom: 10px; padding: 4px 10px; border-radius: 999px; background: rgba(20, 13, 10, .82); color: var(--gold); font: 700 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; }
+@media (max-width: 768px) { .view { animation-name: viewInM; } @keyframes viewInM { from { opacity: 0; } to { opacity: 1; } } }
+@media (max-width: 768px) { .brand { min-height: 48px; } }
