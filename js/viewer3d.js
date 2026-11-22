@@ -243,7 +243,7 @@ export class Viewer {
     const scene = (this.scene = new THREE.Scene());
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 400);
 
-    scene.add(new THREE.HemisphereLight(0xc9dcff, 0x3a2614, 0.9));
+    const hemi = new THREE.HemisphereLight(0xc9dcff, 0x3a2614, 0.9); scene.add(hemi);
     const key = new THREE.DirectionalLight(0xfff0d8, 2.6);
     key.position.set(8, 20, 22);
     key.castShadow = !LOW;
@@ -252,8 +252,10 @@ export class Viewer {
     key.shadow.bias = -0.0006;
     key.shadow.normalBias = 0.02;
     scene.add(key);
-    if (!LOW) { const rim = new THREE.DirectionalLight(0x9cc2ff, 1.3); rim.position.set(-12, 14, -14); scene.add(rim); }
+    let rim = null;
+    if (!LOW) { rim = new THREE.DirectionalLight(0x9cc2ff, 1.3); rim.position.set(-12, 14, -14); scene.add(rim); }
     const candle = new THREE.PointLight(0xffa860, 60, 40, 2); candle.position.set(0, 7, 10); scene.add(candle);
+    this.L = { hemi, key, rim, candle };
 
     if (!LOW) {
       const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.ShadowMaterial({ opacity: 0.4 }));
@@ -387,6 +389,7 @@ export class Viewer {
     document.addEventListener('visibilitychange', this.onVis);
     this.ready = true;
     this.applyLook();
+    if (this.light) this.setLight(this.light);
   }
 
   /** перенести полотно в інший контейнер (вітрина ↔ майстерня) */
@@ -428,6 +431,23 @@ export class Viewer {
   }
 
   setLook(look) { this.look = look; this.applyLook(); }
+
+  /* ---------- освітлення: «день» або «світло свічки» (теплий вогник знизу з живим мерехтінням) ---------- */
+  setLight(mode) {
+    this.light = mode;
+    const L = this.L;
+    if (!L) return;
+    const candle = mode === 'candle';
+    L.hemi.color.set(candle ? 0xffb07a : 0xc9dcff); L.hemi.groundColor.set(candle ? 0x2a1208 : 0x3a2614);
+    L.hemi.intensity = candle ? 0.22 : 0.9;
+    L.key.color.set(candle ? 0xffb27a : 0xfff0d8); L.key.intensity = candle ? 0.35 : 2.6;
+    if (L.rim) { L.rim.color.set(candle ? 0xff7a30 : 0x9cc2ff); L.rim.intensity = candle ? 0.5 : 1.3; }
+    L.candle.color.set(candle ? 0xff9a42 : 0xffa860);
+    L.candle.distance = candle ? 70 : 40;
+    if (candle) L.candle.position.set(0, this.starY - 11, STAR_Z + 9);
+    else { L.candle.position.set(0, 7, 10); L.candle.intensity = 60; }
+    this.renderer.toneMappingExposure = candle ? 1.18 : 1.05;
+  }
   applyLook() {
     if (!this.ready) return;
     const painted = this.look === 'painted';
@@ -519,6 +539,10 @@ export class Viewer {
     }
     this.controls.autoRotate = this.auto && !this.dragging && !this.tween && this.t > this.resumeAt;
     this.controls.update(dt);
+    if (this.light === 'candle') { // живе полум’я: кілька повільних хвиль, без різких спалахів
+      const t = this.t;
+      this.L.candle.intensity = 260 * (1 + 0.07 * Math.sin(t * 6.3) + 0.045 * Math.sin(t * 11.7 + 1.3) + 0.03 * Math.sin(t * 2.1));
+    }
     // сніг
     const p = this.snow.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {

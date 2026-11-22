@@ -523,3 +523,39 @@ export function presetColors(design, presetId) {
   const swap = PRESETS.find((p) => p.id === presetId)?.swap || {};
   return Object.fromEntries(Object.entries(design.slots).map(([k, v]) => [k, swap[v.def] || v.def]));
 }
+
+/* Кнопка «Випадкова ідея»: продумані поєднання тих самих 5 фарб набору (заміна кольорів за роллю) */
+export const IDEAS = [
+  { id: 'xmas', title: 'Класика Різдва', map: {} },
+  { id: 'nightgold', title: 'Нічне золото', map: { white: 'black', black: 'gold' } },
+  { id: 'scandi', title: 'Сканді-мінімалізм', map: { green: 'black', gold: 'black' } },
+  { id: 'folk', title: 'Традиційний орнамент', map: { green: 'black', gold: 'red' } },
+  { id: 'forest', title: 'Хвойний ліс', map: { white: 'green', green: 'white', red: 'gold' } },
+  { id: 'ember', title: 'Вогник свічки', map: { white: 'red', red: 'gold', green: 'black' } },
+];
+export function ideaColors(design, ideaId) {
+  const map = IDEAS.find((i) => i.id === ideaId)?.map || {};
+  return Object.fromEntries(Object.entries(design.slots).map(([k, v]) => [k, map[v.def] || v.def]));
+}
+
+/* Порада майстра — один рядок для вибраного узору */
+const MASTER_TIPS = {
+  rays: 'Великі площини — двома тонкими шарами',
+  stripes: 'Смуги веди від центру до кінчика',
+  triangles: 'Спершу великі трикутники, потім малі',
+  podillia: 'Чорне серце ромба — по сухому червоному',
+  hutsul: 'Кривульку — найтоншим кінчиком пензля',
+  kalyna: 'Ягідка — один дотик пензлика',
+  kolosky: 'Зернятка — короткі мазки під кутом',
+  zirochky: 'Зірочки малюй від центру назовні',
+  ruzha: 'Ромби ружі фарбуй через один',
+  pavuk: 'Намистинки став кінчиком пензлика',
+  vyshyvanka: 'Хрестик — дві короткі риски',
+  petrykivka: 'Пелюстку — одним мазком з натиском',
+  moroz: 'Іній — легкі штрихи по сухій хвої',
+  merezhyvo: 'Золото — в самому кінці, по сухому',
+  kosiv: 'Чорний контур — коли тюльпани висохнуть',
+  hrona: 'Білий відблиск на ягідку — наостанок',
+  pysanka: 'Клини через один, далі — пауза',
+};
+DESIGNS.forEach((d) => { d.masterTip = MASTER_TIPS[d.id] || 'Золото наноси в самому кінці, по сухому'; });
