@@ -16,6 +16,7 @@ import { starOnly, villageOnly, VILLAGE_H, COMP } from './compose.js';
 import { DESIGN } from './ornaments.js';
 import { VILLAGE } from './village.js';
 import { traceAlpha, rasterize } from './trace.js';
+const UP = new THREE.Vector3(0, 1, 0);
 
 /* ---------- розміри ---------- */
 const HALF = STAR.sizeCm / 2;
@@ -220,6 +221,7 @@ export class Viewer {
     this.look = 'painted';
     this.viewName = 'front';
     this.auto = true;
+    this.touched = false; this.swayT = 0; this.swayOff = 0; // демо-покачування до першого дотику
     this.active = false;
     this.dragging = false;
     this.t = 0;
@@ -368,7 +370,7 @@ export class Viewer {
       minDistance: 14, maxDistance: 95, rotateSpeed: 0.85, zoomSpeed: 0.8,
       autoRotate: true, autoRotateSpeed: 1.6, minPolarAngle: 0.05, maxPolarAngle: Math.PI * 0.92,
     });
-    c.addEventListener('start', () => { this.dragging = true; this.tween = null; });
+    c.addEventListener('start', () => { this.dragging = true; this.tween = null; this.touched = true; });
     c.addEventListener('end', () => { this.dragging = false; this.resumeAt = this.t + 3; });
 
     this.views = {
@@ -537,7 +539,15 @@ export class Viewer {
       this.camera.position.setFromSpherical(new THREE.Spherical(lerp(tw.s0.radius, tw.s1.radius), lerp(tw.s0.phi, tw.s1.phi), lerp(tw.s0.theta, tw.s1.theta))).add(this.controls.target);
       if (k >= 1) this.tween = null;
     }
-    this.controls.autoRotate = this.auto && !this.dragging && !this.tween && this.t > this.resumeAt;
+    if (!this.touched && this.auto && !this.tween && !this.dragging) {
+      // «О, вона об’ємна!» — легке покачування ±17° туди-назад, поки ніхто не торкнувся
+      this.swayT += dt;
+      const off = 0.3 * Math.min(1, this.swayT / 1.2) * Math.sin(this.swayT * 1.15);
+      this._sv = (this._sv || new THREE.Vector3()).copy(this.camera.position).sub(this.controls.target).applyAxisAngle(UP, off - this.swayOff);
+      this.camera.position.copy(this.controls.target).add(this._sv);
+      this.swayOff = off;
+      this.controls.autoRotate = false;
+    } else this.controls.autoRotate = this.auto && !this.dragging && !this.tween && this.t > this.resumeAt;
     this.controls.update(dt);
     if (this.light === 'candle') { // живе полум’я: кілька повільних хвиль, без різких спалахів
       const t = this.t;

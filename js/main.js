@@ -6,6 +6,7 @@ import { compose, variantOf, starHandmade, svgUrl } from './compose.js';
 import { DESIGN, DESIGNS, LEVELS, PRESETS, IDEAS, presetColors, ideaColors } from './ornaments.js';
 import { initAmbientBg, initDrum, initScrollFx } from './landing-fx.js';
 import { initPlayer } from './player.js';
+import { createTour, tourSeen } from './tour.js';
 import { renderPNG, downloadBlob } from './export.js';
 
 const $ = (s) => document.querySelector(s);
@@ -135,24 +136,22 @@ function setLook(look) {
 }
 // «Світло свічки»: як зірка виглядатиме ввечері поруч зі свічкою Lava Aroma Candles
 let lightMode = 'day';
-$('#lightBtn').addEventListener('click', (e) => {
-  lightMode = lightMode === 'day' ? 'candle' : 'day';
-  const on = lightMode === 'candle';
-  const b = e.currentTarget;
-  b.classList.toggle('is-on', on);
-  b.setAttribute('aria-pressed', String(on));
-  b.setAttribute('aria-label', on ? 'Денне світло' : 'Світло свічки');
-  b.title = on ? 'Денне світло' : 'Світло свічки';
+function setLightMode(mode, quiet) {
+  lightMode = mode;
+  const on = mode === 'candle';
+  document.querySelectorAll('[data-light]').forEach((b) => { const me = b.dataset.light === mode; b.classList.toggle('is-on', me); b.setAttribute('aria-pressed', String(me)); });
   $('.viewer-card').classList.toggle('is-candle', on);
-  viewer?.setLight(lightMode);
-  toast(on ? 'Світло свічки 🕯️' : 'Денне світло ☀️');
-});
+  viewer?.setLight(mode);
+  if (!quiet) toast(on ? 'Світло свічки 🕯️' : 'Денне світло ☀️');
+}
+document.querySelectorAll('[data-light]').forEach((b) => b.addEventListener('click', () => { if (b.dataset.light !== lightMode) setLightMode(b.dataset.light); }));
 $('#autoRotateBtn').addEventListener('click', (e) => {
-  const on = !(viewer?.auto ?? true);
+  const on = !(viewer ? viewer.auto : true);
   viewer?.setAuto(on);
-  e.currentTarget.textContent = on ? '⏸' : '▶';
-  e.currentTarget.setAttribute('aria-pressed', String(on));
-  e.currentTarget.setAttribute('aria-label', on ? 'Зупинити обертання' : 'Обертати зірку');
+  const b = e.currentTarget;
+  b.querySelector('.pb-i').textContent = on ? '⏸' : '▶';
+  b.querySelector('.pb-t').textContent = on ? 'Пауза' : 'Крутити';
+  b.setAttribute('aria-pressed', String(on));
 });
 
 /* ---------- фінал ---------- */
@@ -254,12 +253,12 @@ function renderTry() {
   const steps = stepsOf(d);
   $('#tryPanel').innerHTML = `
     <div class="tp-head"><b>${esc(d.title)}</b><button class="linklike" data-scroll="ideas">Інший узор</button></div>
-    <div class="tp-block"><span class="tp-label">Палітри</span>
+    <div class="tp-block"><span class="tp-label">Готові палітри</span>
       <div class="presets">${PRESETS.map((p) => `<button data-tpreset="${p.id}" class="${state.star.preset === p.id ? 'is-on' : ''}">${esc(p.title)}</button>`).join('')}</div></div>
-    <div class="tp-block"><span class="tp-label">Що фарбуємо</span>
+    <div class="tp-block"><span class="tp-label"><i class="tp-n">1</i>Обери деталь зірки</span>
       <div class="parts">${Object.entries(d.slots).map(([k, v]) => `<button data-tslot="${k}" class="${k === slot ? 'is-on' : ''}"><span class="sw ${colors[k] === 'gold' ? 'sw-gold' : ''}" style="${paintBg(colors[k] || v.def)}"></span>${esc(v.label)}</button>`).join('')}</div></div>
-    <div class="tp-block"><span class="tp-label">Фарба</span>
-      <div class="paints">${PAINTS.map((p) => `<button class="paint ${colors[slot] === p.id ? 'is-on' : ''}" data-tpaint="${p.id}" aria-label="${esc(p.name)}"><i class="${p.id === 'gold' ? 'sw-gold' : ''}" style="${paintBg(p.id)}"></i>${esc(p.name)}</button>`).join('')}</div>
+    <div class="tp-block"><span class="tp-label"><i class="tp-n">2</i>Тицьни на колір</span>
+      <div class="paints">${PAINTS.map((p) => `<button class="paint ${colors[slot] === p.id ? 'is-on' : ''}" data-tpaint="${p.id}" aria-label="${esc(p.name)}" aria-pressed="${colors[slot] === p.id}"><i class="${p.id === 'gold' ? 'sw-gold' : ''}" style="${paintBg(p.id)}"></i>${colors[slot] === p.id ? '<b class="chk" aria-hidden="true">✓</b>' : ''}${esc(p.name)}</button>`).join('')}</div>
       <button class="btn btn-ghost tp-random" data-trandom><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.5" cy="8.5" r="1.3"/><circle cx="8.5" cy="15.5" r="1.3"/></svg>Випадкова ідея</button></div>
     <div class="tp-block"><span class="tp-label">Кроки</span>
       <ol class="steps-list">${steps.map((s, i) => `<li><span class="n">${i + 1}</span><div><b>${esc(s.title)}</b><small>${s.dry ? `сохне ${s.dry} хв` : i === steps.length - 1 ? 'фініш ✨' : 'одразу далі'}</small></div></li>`).join('')}</ol></div>
@@ -347,3 +346,23 @@ const player = initPlayer($('#player'), {
 $('#musicBtn').addEventListener('click', () => player.toggle());
 focusObject(state.object);
 route(location.hash.slice(1) || 'showcase');
+
+/* ---------- міні-гід із 3 кроків (раз при першому відкритті; знову — кнопка «?») ---------- */
+const mob = () => matchMedia('(max-width: 768px)').matches;
+const tourSteps = [
+  { anchor: '.viewer-stage', holes: [['.viewer-stage']], hand: true, delay: 300,
+    text: 'Покрути зірку пальцем, щоб роздивитися з усіх боків' },
+  { anchor: '#drum', holes: [['#drum']],
+    text: 'Гортай та обери готовий візерунок для натхнення' },
+  { anchor: '#tryPanel .paints', holes: [['#tryPanel .paints'], ['.light-row']],
+    minTop: () => $('.topbar').offsetHeight + (mob() ? $('.viewer-card').offsetHeight : 0),
+    text: 'Тицяй на кольори з набору та приміряй розпис' },
+];
+const tour = createTour(tourSteps);
+$('#helpBtn').addEventListener('click', () => {
+  if (state.view !== 'showcase') { show('showcase'); setTimeout(() => tour.start(), 450); } else tour.start();
+});
+$('#viewer3d').addEventListener('pointerdown', () => $('.viewer-card').classList.add('was-touched'), { once: true });
+if (!tourSeen()) {
+  setTimeout(() => { if (!tourSeen() && state.view === 'showcase' && !tour.active) tour.start(); }, 1400);
+}
