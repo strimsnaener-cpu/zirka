@@ -39,30 +39,18 @@
       <!-- Вітання -->
       <section class="hx" id="offer" data-sec>
         <h1 class="hx-title">Зірка <em>оживає</em></h1>
-        <p class="hx-lead">Обери узор. Приміряй кольори. Малюй.</p>
-        <button class="btn btn-gold btn-lg hx-go" data-scroll="ideas">Почати <span aria-hidden="true">↓</span></button>
+        <p class="hx-lead">Запали свічку — і твоя зірка оживе.</p>
+        <button class="candle-go" id="candleGo" aria-label="Запалити свічку й відкрити 3D-зірку">
+          <span class="candle" aria-hidden="true"><i class="flame"></i><i class="wick"></i><i class="wax"></i></span>
+          <span class="candle-t">Запали свічку</span>
+        </button>
+        <button class="linklike hx-alt" data-scroll="ideas">або обери узор ↓</button>
       </section>
 
-      <!-- Крок 1 · барабан узорів -->
-      <section class="sec" id="ideas" data-sec>
-        <div class="ghost-wrap" aria-hidden="true"><div class="ghost" data-ghost>Різдво</div></div>
-        <p class="tag">Крок 1</p>
-        <h2 class="h-xl">Обери <em>узор</em></h2>
-        <p class="sec-lead">Гортай і тисни на картку</p>
-        <div class="drum" id="drum" aria-roledescription="карусель" aria-label="Узори розпису. Гортайте пальцем або мишкою.">
-          <div class="drum-ring" id="drumRing"></div>
-        </div>
-        <div class="drum-bar">
-          <button class="round-btn" data-drum="-1" aria-label="Попередній узор">←</button>
-          <div class="drum-info" id="drumInfo" aria-live="polite"></div>
-          <button class="round-btn" data-drum="1" aria-label="Наступний узор">→</button>
-        </div>
-      </section>
-
-      <!-- Крок 2 · кольори в 3D -->
+      <!-- Крок 1 · твоя зірка в 3D -->
       <section class="sec" id="try" data-sec>
         <div class="ghost-wrap" aria-hidden="true"><div class="ghost" data-ghost>Майстерня</div></div>
-        <p class="tag">Крок 2</p>
+        <p class="tag">Крок 1 · твоя зірка</p>
         <h2 class="h-xl">Приміряй <em>кольори</em></h2>
         <div class="try">
           <div class="viewer-card">
@@ -74,15 +62,10 @@
             <div class="viewer-ui">
               <div class="seg seg-sm" role="group" aria-label="Ракурс">
                 <button data-view3d="front" class="is-on">Спереду</button>
-                <button data-view3d="side">Збоку</button>
                 <button data-view3d="stand">Село</button>
               </div>
             </div>
             <div class="viewer-ui viewer-ui-b">
-              <div class="seg seg-sm" role="group" aria-label="Що показати">
-                <button data-look="painted" class="is-on">Розпис</button>
-                <button data-look="kit">Заготовка</button>
-              </div>
               <button class="pill-btn" id="autoRotateBtn" aria-pressed="true"><span class="pb-i" aria-hidden="true">⏸</span><span class="pb-t">Пауза</span></button>
             </div>
             </div>
@@ -94,6 +77,22 @@
             </div>
           </div>
           <div class="try-panel" id="tryPanel"></div>
+        </div>
+      </section>
+
+      <!-- Крок 2 · ще узори (барабан) -->
+      <section class="sec" id="ideas" data-sec>
+        <div class="ghost-wrap" aria-hidden="true"><div class="ghost" data-ghost>Різдво</div></div>
+        <p class="tag">Крок 2 · ще 17 ідей</p>
+        <h2 class="h-xl">Інші <em>узори</em></h2>
+        <p class="sec-lead">Гортай і тисни на картку</p>
+        <div class="drum" id="drum" aria-roledescription="карусель" aria-label="Узори розпису. Гортайте пальцем або мишкою.">
+          <div class="drum-ring" id="drumRing"></div>
+        </div>
+        <div class="drum-bar">
+          <button class="round-btn" data-drum="-1" aria-label="Попередній узор">←</button>
+          <div class="drum-info" id="drumInfo" aria-live="polite"></div>
+          <button class="round-btn" data-drum="1" aria-label="Наступний узор">→</button>
         </div>
       </section>
 
@@ -146,12 +145,12 @@
           <h2 class="h-big">Твоя зірка <em>засяяла</em></h2>
           <p class="lead" id="finishText"></p>
           <div class="finish-actions">
-            <button class="btn btn-gold btn-lg" id="saveBtn">Зберегти фото</button>
+            <button class="btn btn-gold btn-lg" id="saveBtn">Зберегти для сторіз</button>
             <button class="btn btn-ghost" id="shareBtn" hidden>Поділитися</button>
             <button class="btn btn-ghost" data-scroll="try" data-look-go="painted">У 3D</button>
             <button class="btn btn-ghost" data-go="workshop" data-mode="create">Змінити</button>
           </div>
-          <p class="tiny">Для сторіз · <b>#ЗіркаОживає</b></p>
+          <p class="tiny">Картинка 9:16 · познач <b>#ЗіркаОживає</b></p>
         </div>
         <div class="finish-preview" id="finishPreview"></div>
       </div>

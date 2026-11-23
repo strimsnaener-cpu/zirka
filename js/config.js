@@ -20,18 +20,28 @@
    calib        — точне підганяння фото під 3D-контур (масштаб/зсув/поворот).
 --------------------------------------------------------------------------- */
 /* ---------- Фото готових розписаних зірок ------------------------------
-   Файли: public/images/painted/star-1.jpg … star-17.jpg (номер = узор у каруселі, див. README.txt там же).
-   Немає файлу — картка показує намальоване превʼю; є — показує фото. Нічого більше міняти не треба.
+   Файли: public/images/painted/star-1.jpg … star-17.jpg (див. README.txt там же) + рядок у PAINTED_PHOTOS.files.
+   Немає рядка — картка показує намальоване превʼю; є — справжнє фото з позначкою «Фото».
 --------------------------------------------------------------------------- */
-export const PAINTED_PHOTOS = { dir: 'public/images/painted/', prefix: 'star-', ext: 'jpg' };
+export const PAINTED_PHOTOS = {
+  dir: 'public/images/painted/',
+  /* Є фото — розкоментуй рядок (ключ = узор). Ні зайвих запитів, ні помилок 404. */
+  files: {
+    // rays: 'star-1.jpg', stripes: 'star-2.jpg', triangles: 'star-3.jpg', podillia: 'star-4.jpg',
+    // hutsul: 'star-5.jpg', kalyna: 'star-6.jpg', kolosky: 'star-7.jpg', zirochky: 'star-8.jpg',
+    // ruzha: 'star-9.jpg', pavuk: 'star-10.jpg', vyshyvanka: 'star-11.jpg', petrykivka: 'star-12.jpg',
+    // moroz: 'star-13.jpg', merezhyvo: 'star-14.jpg', kosiv: 'star-15.jpg', hrona: 'star-16.jpg', pysanka: 'star-17.jpg',
+  },
+};
 
 export const ASSETS = {
-  starFront: 'assets/star-front.png',
-  starBack: 'assets/star-back.png',
-  villageStand: 'assets/village-stand.png',
+  // поки файлів немає — null (модель на процедурному дереві, жодних 404); є фото — впиши шлях
+  starFront: null, // 'assets/star-front.png'
+  starBack: null, // 'assets/star-back.png'
+  villageStand: null, // 'assets/village-stand.png'
   textures: {
-    face: 'assets/textures/plywood-face.jpg',
-    edge: 'assets/textures/plywood-edge.jpg',
+    face: null, // 'assets/textures/plywood-face.jpg'
+    edge: null, // 'assets/textures/plywood-edge.jpg'
     repeatCm: 12, // скільки сантиметрів дерева вміщує одне фото текстури
   },
   calib: {
@@ -45,13 +55,6 @@ export const ASSETS = {
     { view: 'side', src: 'assets/reference/star-edge.jpg', note: 'торець — для товщини' },
     { view: 'stand', src: 'assets/reference/stand-front.jpg', note: 'підставка спереду' },
     { view: 'front', src: 'assets/photos/kit-raw-wood.webp', note: 'наявне фото (знято під кутом)' },
-  ],
-  // Реальні фото набору для галереї під вітриною
-  gallery: [
-    { src: 'assets/photos/kit-raw-wood.webp', caption: 'Дерев’яна зірка 17×17 см на підставці' },
-    { src: 'assets/photos/kit-primed.webp', caption: 'Загрунтована зірка з різьбленим орнаментом' },
-    { src: 'assets/photos/kit-primed-paints.webp', caption: 'Повний набір: фарби та пензлик' },
-    { src: 'assets/photos/painted-concept.webp', caption: 'Ідея готового розпису' },
   ],
 };
 
@@ -111,19 +114,6 @@ export const STAND = {
 export const BRAND = {
   name: 'Lava Aroma Candles',
   product: 'Зірка оживає',
-  tagline: 'Різдвяна онлайн-майстерня',
   hashtag: '#ЗіркаОживає',
 };
 
-/* ---------- 6. Головна після QR: поради (FAQ) ---------------------------
-   {dry} у відповіді підставляється автоматично — час висихання за орнаментами.
---------------------------------------------------------------------------- */
-export const LANDING = {
-  faq: [
-    { q: 'Чи впораюся я, якщо ніколи не малював(-ла)?', a: 'Так. Обираєш орнамент свого рівня — від «Моя перша зірка» до «Майстер розпису», — а майстерня веде крок за кроком: що фарбувати, якою фарбою і в якому порядку.' },
-    { q: 'Скільки часу займає розпис?', a: 'Залежить від орнаменту: на сам розпис — близько години, плюс час на висихання між кроками ({dry}). Таймер у майстерні підкаже, коли можна продовжувати.' },
-    { q: 'Чи можна вибрати свої кольори?', a: 'Так, у режимі «Створюю» будь-яку частину орнаменту можна перефарбувати однією з 5 фарб набору або взяти готову палітру — «Нічна», «Хвойна», «Вогняна», «Золота».' },
-    { q: 'Чи працює майстерня на телефоні?', a: 'Так, її зроблено насамперед для телефона: відскануй QR-код із коробки — і можна починати. Нічого встановлювати не треба.' },
-    { q: 'Як поділитися результатом?', a: 'Після розпису натисни «Зберегти мою зірку» — отримаєш картинку 1080×1350, саме під сторіз і пости. Познач нас: #ЗіркаОживає.' },
-  ],
-};

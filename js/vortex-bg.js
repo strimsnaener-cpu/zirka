@@ -57,6 +57,7 @@ export async function initVortexBg(canvas) {
 
   let w = 1, h = 1, R = 5, halfW = 3, halfH = 5;
   function resize() {
+    if (!innerWidth || !innerHeight) return; // згорнуте/0×0 вікно — не рахуємо NaN
     w = innerWidth; h = innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -65,7 +66,9 @@ export async function initVortexBg(canvas) {
     R = Math.max(halfW, halfH) * (MOBILE ? 1.05 : 0.95);
   }
   resize();
-  addEventListener('resize', resize);
+  // адресний рядок iOS змінює лише висоту — не перестворюємо буфер (CSS просто розтягує полотно)
+  let lastW = innerWidth;
+  addEventListener('resize', () => { if (Math.abs(innerWidth - lastW) > 2) { lastW = innerWidth; resize(); } });
 
   // палець / мишка → точка у світі вихору (площина z = 0)
   const ptr = { x: 0, y: 0, on: false, e: 0, last: 0 };
@@ -75,8 +78,7 @@ export async function initVortexBg(canvas) {
     ptr.x = x; ptr.y = y; ptr.on = true; ptr.last = performance.now();
   };
   addEventListener('pointermove', (e) => move(e.clientX, e.clientY), { passive: true });
-  addEventListener('touchmove', (e) => { const t = e.touches[0]; if (t) move(t.clientX, t.clientY); }, { passive: true });
-  addEventListener('touchend', () => { ptr.on = false; }, { passive: true });
+  addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') ptr.on = false; }, { passive: true });
 
   const TILT = 1.02, ct = Math.cos(TILT), st = Math.sin(TILT);
   const cen = { x: 0, y: 0.35 * halfH };
@@ -120,13 +122,17 @@ export async function initVortexBg(canvas) {
     renderer.render(scene, camera);
   }
 
-  let raf = 0, last = performance.now();
-  const frame = (now) => { raf = 0; step(Math.min(0.05, (now - last) / 1000)); last = now; loop(); };
-  const loop = () => { if (!raf && !reduced && !document.hidden) raf = requestAnimationFrame(frame); };
+  let raf = 0, last = performance.now(), paused = false;
+  const frame = (now) => { raf = 0; step(Math.max(0, Math.min(0.05, (now - last) / 1000))); last = now; loop(); };
+  const loop = () => { if (!raf && !reduced && !paused && !document.hidden) raf = requestAnimationFrame(frame); };
   document.addEventListener('visibilitychange', () => { last = performance.now(); loop(); });
   step(0.016);
   canvas.classList.add('is-on');
   loop();
   addEventListener('pagehide', (e) => { if (e.persisted) return; geo.dispose(); mat.dispose(); dot.dispose(); renderer.dispose(); });
-  return { renderer };
+  return {
+    renderer,
+    /** поки на екрані 3D-зірка (своя WebGL-сцена) — фон стоїть: один GPU-контекст за раз */
+    pause(on) { paused = !!on; if (paused && raf) { cancelAnimationFrame(raf); raf = 0; } else if (!paused) { last = performance.now(); loop(); } },
+  };
 }

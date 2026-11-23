@@ -251,7 +251,7 @@ export function initScrollFx({ isActive = () => true } = {}) {
   const ghosts = [...document.querySelectorAll('[data-ghost]')];
 
   // плавна поява блоків
-  const rv = document.querySelectorAll('.sec .tag, .sec .h-xl, .sec-lead, .try > *, .how-c, .kit, .gallery, .faq details');
+  const rv = document.querySelectorAll('.sec .tag, .sec .h-xl, .sec-lead, .try > *');
   rv.forEach((el) => el.classList.add('rv'));
   if ('IntersectionObserver' in window && !reduced) {
     const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); } }), { rootMargin: '0px 0px -6% 0px' });

@@ -371,6 +371,9 @@ export class Viewer {
       autoRotate: true, autoRotateSpeed: 1.6, minPolarAngle: 0.05, maxPolarAngle: Math.PI * 0.92,
     });
     c.addEventListener('start', () => { this.dragging = true; this.tween = null; this.touched = true; });
+    // телефон: вертикальний свайп по зірці гортає сторінку, горизонтальний — крутить зірку
+    // (OrbitControls сам ставить touch-action:none — перевизначаємо після створення)
+    if (MOBILE) r.domElement.style.touchAction = 'pan-y';
     c.addEventListener('end', () => { this.dragging = false; this.resumeAt = this.t + 3; });
 
     this.views = {
@@ -491,6 +494,8 @@ export class Viewer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    // setSize очищає буфер — одразу малюємо кадр, щоб полотно не блимало порожнім
+    if (this.scene) this.renderer.render(this.scene, this.camera);
   }
 
   setActive(on) {

@@ -508,7 +508,7 @@ const pysanka = {
 export const DESIGNS = [rays, stripes, triangles, podillia, hutsul, kalyna, kolosky, zirochky, ruzha, pavuk, vyshyvanka, petrykivka, moroz, merezhyvo, kosiv, hrona, pysanka];
 export const DESIGN = Object.fromEntries(DESIGNS.map((d) => [d.id, d]));
 // realPhotoUrl — справжнє фото розписаної зірки (може ще не існувати — тоді показуємо превʼю)
-DESIGNS.forEach((d, i) => { d.realPhotoUrl = `${PAINTED_PHOTOS.dir}${PAINTED_PHOTOS.prefix}${i + 1}.${PAINTED_PHOTOS.ext}`; });
+DESIGNS.forEach((d) => { const f = PAINTED_PHOTOS.files?.[d.id]; d.realPhotoUrl = f ? PAINTED_PHOTOS.dir + f : null; });
 for (const d of DESIGNS) d.bare = { fill: 'wood', layers: ['base'] };
 
 /* Пресети кольорів — перестановки 5 фарб (щоб лишалися лише фарби набору) */

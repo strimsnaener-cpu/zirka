@@ -1,5 +1,5 @@
 /* Точка входу: маршрути між екранами, зв’язок майстерні з 3D та фіналом. */
-import { ASSETS, LANDING, BRAND, PAINTS, PAINT } from './config.js';
+import { BRAND, PAINTS, PAINT } from './config.js';
 import { state, set, subscribe } from './store.js';
 import { renderWorkshop, setMode, setObject, focusObject, setToast, onFinish, visibleLayers, stepsOf } from './workshop.js';
 import { compose, variantOf, starHandmade, svgUrl } from './compose.js';
@@ -76,9 +76,10 @@ function attachShowcase() {
   if (!tryVisible) { viewer?.setActive(false); return; }
   ensureViewer().then((v) => {
     if (!v || state.view !== 'showcase' || !tryVisible) return;
+    const fresh = v.host !== $('#viewer3d');
     v.attach($('#viewer3d'));
     v.setLook(state.look);
-    v.setView(showView, true);
+    if (fresh) v.setView(showView, true);
     refresh3d(0);
     v.setActive(tryInView);
   });
@@ -90,13 +91,13 @@ function show(view) {
   if (!VIEWS.includes(view)) view = 'showcase';
   state.view = view;
   document.querySelectorAll('.view').forEach((s) => (s.hidden = s.dataset.view !== view));
-  document.querySelectorAll('.tabs [data-go]').forEach((b) => b.classList.toggle('is-on', b.dataset.go === view));
   if (view === 'showcase') attachShowcase();
   else if (view === 'workshop' && stage3d) setStage3d(true);
   else viewer?.setActive(false);
   if (view === 'workshop') renderWorkshop();
   if (view === 'finish') renderFinish();
   document.body.dataset.view = view;
+  queueMicrotask(() => bgSync()); // вихор спить, поки працює 3D або відкрито майстерню
   if (view === 'showcase') fx?.update();
   if (location.hash.slice(1) !== view) history.replaceState(null, '', '#' + view);
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
@@ -169,16 +170,16 @@ $('#saveBtn').addEventListener('click', async (e) => {
     lastBlob = await renderPNG(state);
     downloadBlob(lastBlob, `moya-zirka-${state.star.designId}.png`);
     toast('Картинку збережено ✨');
-    const file = new File([lastBlob], 'moya-zirka.png', { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) $('#shareBtn').hidden = false;
   } catch (err) {
     console.error(err);
     toast('Не вдалося зберегти — спробуй ще раз');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Зберегти мою зірку';
+    btn.textContent = 'Зберегти для сторіз';
   }
 });
+// «Поділитися» видно одразу, якщо телефон уміє ділитися файлами (iOS/Android) — одним тапом у сторіз
+try { $('#shareBtn').hidden = !navigator.canShare?.({ files: [new File(['x'], 'z.png', { type: 'image/png' })] }); } catch { /* ні — лишається «Зберегти» */ }
 $('#shareBtn').addEventListener('click', async () => {
   try {
     const blob = lastBlob || (await renderPNG(state));
@@ -201,34 +202,19 @@ function applyDesign(id) {
   setLook('painted');
 }
 
-// справжні фото розписаних зірок: перевіряємо тихо (без «битих» картинок) і лише для карток поруч
-const photoOk = new Map(); // id → true | false | 'loading'
-const artHtml = (d) => (photoOk.get(d.id) === true
-  ? `<div class="dc-art is-photo"><img src="${d.realPhotoUrl}" alt="${esc(d.title)} — розписано вручну" draggable="false"><span class="dc-real">Фото</span></div>`
+// справжнє фото розписаної зірки (якщо вписане в PAINTED_PHOTOS.files), інакше — превʼю «як розписано вручну»
+const artHtml = (d) => (d.realPhotoUrl
+  ? `<div class="dc-art is-photo"><img src="${d.realPhotoUrl}" alt="${esc(d.title)} — розписано вручну" loading="lazy" draggable="false"><span class="dc-real">Фото</span></div>`
   : `<div class="dc-art"><img src="${svgUrl(starHandmade(d.id, presetColors(d, 'classic'), { idp: 'hm', seed: 3 + (d.id.length % 7) }))}" alt="" draggable="false"></div>`);
-function probePhoto(d) {
-  if (!d?.realPhotoUrl || photoOk.has(d.id)) return;
-  photoOk.set(d.id, 'loading');
-  const im = new Image();
-  im.decoding = 'async';
-  im.onload = () => {
-    photoOk.set(d.id, true);
-    document.querySelectorAll(`.dc[data-id="${d.id}"] .dc-art`).forEach((a) => (a.outerHTML = artHtml(d)));
-  };
-  im.onerror = () => photoOk.set(d.id, false);
-  im.src = d.realPhotoUrl;
-}
 
-// Крок 1 · барабан узорів
+// Крок 2 · барабан узорів
 const drum = initDrum($('#drum'), $('#drumRing'), {
   render: (d) => `<div class="dc" data-id="${d.id}">
       ${artHtml(d)}
       <div class="dc-meta"><b>${esc(d.title)}</b><small>${esc(d.origin || levelTitle(d.level))}</small></div>
       <span class="dc-open" aria-hidden="true">Обрати</span></div>`,
   onActive: (d) => {
-    const i = DESIGNS.indexOf(d), n = DESIGNS.length;
-    for (let k = -2; k <= 2; k++) probePhoto(DESIGNS[(i + k + n) % n]);
-    $('#drumInfo').innerHTML = `<b>${esc(d.title)}</b><small class="master-tip"><span aria-hidden="true">💡</span> ${esc(d.masterTip)}</small><button class="btn btn-gold btn-sm" data-try="${d.id}">Обрати ↓</button>`;
+    $('#drumInfo').innerHTML = `<b>${esc(d.title)}</b><small class="master-tip"><span aria-hidden="true">💡</span> ${esc(d.masterTip)}</small><button class="btn btn-gold btn-sm" data-try="${d.id}">На мою зірку ↑</button>`;
   },
   onOpen: (d) => tryDesign(d.id),
 });
@@ -239,9 +225,9 @@ function tryDesign(id) {
   toast('Узор на зірці ✨');
 }
 
-// Крок 2 · примірка кольорів
-const dryOf = (d) => Object.values(d.dry || {}).reduce((a, b) => a + b, 0);
+// Крок 1 · примірка кольорів
 const paintBg = (id) => (id === 'gold' ? '' : `background:${PAINT[id]?.hex || id}`);
+const DICE = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.5" cy="8.5" r="1.3"/><circle cx="8.5" cy="15.5" r="1.3"/></svg>';
 let tryKey = '';
 function renderTry() {
   const d = DESIGN[state.star.designId];
@@ -252,14 +238,15 @@ function renderTry() {
   tryKey = key;
   const steps = stepsOf(d);
   $('#tryPanel').innerHTML = `
-    <div class="tp-head"><b>${esc(d.title)}</b><button class="linklike" data-scroll="ideas">Інший узор</button></div>
-    <div class="tp-block"><span class="tp-label">Готові палітри</span>
-      <div class="presets">${PRESETS.map((p) => `<button data-tpreset="${p.id}" class="${state.star.preset === p.id ? 'is-on' : ''}">${esc(p.title)}</button>`).join('')}</div></div>
+    <div class="tp-head"><b>${esc(d.title)}</b><button class="linklike" data-scroll="ideas">Інший узор ↓</button></div>
+    <div class="tp-block"><span class="tp-label">Готові ідеї</span>
+      <div class="presets ideas">${IDEAS.map((p) => `<button data-tidea="${p.id}" class="${state.star.preset === 'idea:' + p.id ? 'is-on' : ''}">${esc(p.title)}</button>`).join('')}</div>
+      <button class="btn btn-ghost tp-random" data-trandom>${DICE}Випадкова ідея</button></div>
     <div class="tp-block"><span class="tp-label"><i class="tp-n">1</i>Обери деталь зірки</span>
       <div class="parts">${Object.entries(d.slots).map(([k, v]) => `<button data-tslot="${k}" class="${k === slot ? 'is-on' : ''}"><span class="sw ${colors[k] === 'gold' ? 'sw-gold' : ''}" style="${paintBg(colors[k] || v.def)}"></span>${esc(v.label)}</button>`).join('')}</div></div>
     <div class="tp-block"><span class="tp-label"><i class="tp-n">2</i>Тицьни на колір</span>
       <div class="paints">${PAINTS.map((p) => `<button class="paint ${colors[slot] === p.id ? 'is-on' : ''}" data-tpaint="${p.id}" aria-label="${esc(p.name)}" aria-pressed="${colors[slot] === p.id}"><i class="${p.id === 'gold' ? 'sw-gold' : ''}" style="${paintBg(p.id)}"></i>${colors[slot] === p.id ? '<b class="chk" aria-hidden="true">✓</b>' : ''}${esc(p.name)}</button>`).join('')}</div>
-      <button class="btn btn-ghost tp-random" data-trandom><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.5" cy="8.5" r="1.3"/><circle cx="8.5" cy="15.5" r="1.3"/></svg>Випадкова ідея</button></div>
+</div>
     <div class="tp-block"><span class="tp-label">Кроки</span>
       <ol class="steps-list">${steps.map((s, i) => `<li><span class="n">${i + 1}</span><div><b>${esc(s.title)}</b><small>${s.dry ? `сохне ${s.dry} хв` : i === steps.length - 1 ? 'фініш ✨' : 'одразу далі'}</small></div></li>`).join('')}</ol></div>
     <button class="btn btn-gold btn-lg tp-go" data-go="workshop" data-mode="paint">Почати розпис</button>`;
@@ -272,7 +259,7 @@ function goSection(id) {
   requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 document.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-scroll], [data-try], [data-drum], [data-tpreset], [data-tslot], [data-tpaint], [data-trandom]');
+  const b = e.target.closest('[data-scroll], [data-try], [data-drum], [data-tpreset], [data-tslot], [data-tpaint], [data-trandom], [data-tidea]');
   if (!b) return;
   const d = b.dataset;
   if (d.scroll) { e.preventDefault(); if (d.lookGo) setLook(d.lookGo); return goSection(d.scroll); }
@@ -280,6 +267,7 @@ document.addEventListener('click', (e) => {
   if (d.drum) return drum.go(+d.drum);
   const des = DESIGN[state.star.designId];
   if ('trandom' in d) return randomIdea();
+  if (d.tidea) return applyIdea(d.tidea);
   if (d.tpreset) return set({ star: { ...state.star, preset: d.tpreset, colors: presetColors(des, d.tpreset) } });
   if (d.tslot) return set({ selected: { ...state.selected, star: d.tslot } });
   if (d.tpaint) {
@@ -291,16 +279,18 @@ document.addEventListener('click', (e) => {
 
 // «Випадкова ідея»: інше продумане поєднання 5 фарб, щоразу не те саме, що щойно
 let lastIdea = 'xmas';
-function randomIdea() {
-  const des = DESIGN[state.star.designId];
-  const pool = IDEAS.filter((i) => i.id !== lastIdea);
-  const idea = pool[Math.floor(Math.random() * pool.length)];
+function applyIdea(id, quiet) {
+  const idea = IDEAS.find((i) => i.id === id) || IDEAS[0];
   lastIdea = idea.id;
   setLook('painted');
-  set({ star: { ...state.star, preset: null, colors: ideaColors(des, idea.id) } });
+  set({ star: { ...state.star, preset: 'idea:' + idea.id, colors: ideaColors(DESIGN[state.star.designId], idea.id) } });
   const card = $('.viewer-card');
   card.classList.remove('is-flash'); void card.offsetWidth; card.classList.add('is-flash');
-  toast(`${idea.title} ✨`);
+  if (!quiet) toast(`${idea.title} ✨`);
+}
+function randomIdea() {
+  const pool = IDEAS.filter((i) => i.id !== lastIdea);
+  applyIdea(pool[Math.floor(Math.random() * pool.length)].id);
 }
 
 // 3D на головній вантажиться лише коли користувач догортав до примірки (швидкий старт на мобільному)
@@ -311,6 +301,7 @@ if ('IntersectionObserver' in window) {
   new IntersectionObserver(([en]) => {
     tryInView = en.isIntersecting;
     if (state.view === 'showcase' && viewer) viewer.setActive(tryInView);
+    bgSync();
   }).observe($('#viewer3d'));
 } else tryVisible = tryInView = true;
 // сторінку закрили — звільняємо пам’ять GPU (але не при поверненні «Назад» із кешу)
@@ -319,7 +310,9 @@ addEventListener('pagehide', (e) => { if (!e.persisted) viewer?.dispose(); });
 // фон і скрол-ефекти
 // «Зоряний пил»: 3D-вихор вантажиться, коли сторінка вже відкрилась; без WebGL — легкий 2D-фон
 const idle = (fn) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 400));
-const startBg = () => import('./vortex-bg.js').then((m) => m.initVortexBg($('#bgfx'))).catch((err) => {
+var bg = null;
+function bgSync() { bg?.pause?.(state.view !== 'showcase' || tryInView); }
+const startBg = () => import('./vortex-bg.js').then((m) => m.initVortexBg($('#bgfx'))).then((b) => { bg = b; bgSync(); }).catch((err) => {
   console.warn('vortex bg off:', err?.message);
   initAmbientBg($('#bgfx'));
   $('#bgfx').classList.add('is-on');
@@ -346,6 +339,14 @@ const player = initPlayer($('#player'), {
 $('#musicBtn').addEventListener('click', () => player.toggle());
 focusObject(state.object);
 route(location.hash.slice(1) || 'showcase');
+
+/* ---------- свічка-хук на першому екрані: світло свічки → одразу 3D-зірка ---------- */
+$('#candleGo').addEventListener('click', (e) => {
+  const b = e.currentTarget;
+  b.classList.add('is-lit');
+  setLightMode('candle', true);
+  setTimeout(() => { goSection('try'); toast('Світло свічки 🕯️ Покрути зірку'); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
+});
 
 /* ---------- міні-гід із 3 кроків (раз при першому відкритті; знову — кнопка «?») ---------- */
 const mob = () => matchMedia('(max-width: 768px)').matches;
