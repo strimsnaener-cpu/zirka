@@ -1,4 +1,4 @@
-/* Фон «Зоряний пил»: невагомий спіральний 3D-вихор із теплих золотих і кремових іскор.
+/* Фон «Зоряний пил»: невагомий спіральний 3D-вихор із матово-золотих іскор і сніжинок (світле ательє).
    Один THREE.Points-буфер (≈150 частинок на телефоні, 250 на ПК), один draw call, адитивне змішування.
    Сам повільно крутиться; за пальцем / мишкою потік м’яко тягнеться й закручується.
    Three.js підвантажується, коли сторінка вже відкрилася (його потім бере й 3D-зірка — з кешу). */
@@ -29,18 +29,19 @@ export async function initVortexBg(canvas) {
   })();
 
   const N = MOBILE ? 150 : 250;
-  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 4); // RGBA: на світлому тлі згасання — через прозорість, не через колір
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage));
   const mat = new THREE.PointsMaterial({
-    size: MOBILE ? 0.34 : 0.24, map: dot, vertexColors: true, transparent: true, opacity: 0.5,
-    depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true,
+    size: MOBILE ? 0.34 : 0.26, map: dot, vertexColors: true, transparent: true, opacity: 0.8,
+    depthWrite: false, blending: THREE.NormalBlending, sizeAttenuation: true,
   });
   scene.add(new THREE.Points(geo, mat));
 
-  // золото #E6B85C і крем #F5EFE6
-  const GOLD = [0.9, 0.72, 0.36], CREAM = [0.96, 0.94, 0.9];
+  // матове золото #C8963E і сніжинки #FFFFFF (у лінійному просторі three)
+  const lin = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
+  const GOLD = lin('#c8963e'), CREAM = lin('#ffffff');
   const ARMS = 3;
   const P = Array.from({ length: N }, () => spawn({}, Math.random()));
   function spawn(p, r = 1) {
@@ -50,7 +51,7 @@ export async function initVortexBg(canvas) {
     p.v = 0.018 + Math.random() * 0.03; // повільне затягування до центру
     p.h = (Math.random() - 0.5) * 0.5; // товщина диска
     p.tw = 0.6 + Math.random() * 1.6; p.ph = Math.random() * 6.28;
-    p.c = Math.random() < 0.6 ? GOLD : CREAM;
+    p.c = Math.random() < 0.68 ? GOLD : CREAM; p.big = p.c === CREAM;
     p.ox = p.oy = 0;
     return p;
   }
@@ -115,7 +116,7 @@ export async function initVortexBg(canvas) {
       // яскравість: згасання до країв і в самому центрі + м’яке мерехтіння
       const edge = Math.min(1, (1 - r) * 3.2) * Math.min(1, r * 5);
       const b = edge * (0.55 + 0.45 * Math.sin(t * p.tw + p.ph));
-      col[i * 3] = p.c[0] * b; col[i * 3 + 1] = p.c[1] * b; col[i * 3 + 2] = p.c[2] * b;
+      col[i * 4] = p.c[0]; col[i * 4 + 1] = p.c[1]; col[i * 4 + 2] = p.c[2]; col[i * 4 + 3] = Math.max(0, b) * (p.big ? 0.95 : 0.8);
     }
     geo.attributes.position.needsUpdate = true;
     geo.attributes.color.needsUpdate = true;

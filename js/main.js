@@ -135,7 +135,7 @@ function setLook(look) {
   document.querySelectorAll('[data-look]').forEach((x) => x.classList.toggle('is-on', x.dataset.look === look));
   viewer?.setLook(look);
 }
-// «Світло свічки»: як зірка виглядатиме ввечері поруч зі свічкою Lava Aroma Candles
+// «Вечір зі свічкою»: як зірка виглядатиме ввечері поруч зі свічкою Lava Aroma Candles
 let lightMode = 'day';
 function setLightMode(mode, quiet) {
   lightMode = mode;
@@ -143,7 +143,7 @@ function setLightMode(mode, quiet) {
   document.querySelectorAll('[data-light]').forEach((b) => { const me = b.dataset.light === mode; b.classList.toggle('is-on', me); b.setAttribute('aria-pressed', String(me)); });
   $('.viewer-card').classList.toggle('is-candle', on);
   viewer?.setLight(mode);
-  if (!quiet) toast(on ? 'Світло свічки 🕯️' : 'Денне світло ☀️');
+  if (!quiet) toast(on ? 'Вечір зі свічкою 🕯️' : 'Денне світло ☀️');
 }
 document.querySelectorAll('[data-light]').forEach((b) => b.addEventListener('click', () => { if (b.dataset.light !== lightMode) setLightMode(b.dataset.light); }));
 $('#autoRotateBtn').addEventListener('click', (e) => {
@@ -211,10 +211,10 @@ const artHtml = (d) => (d.realPhotoUrl
 const drum = initDrum($('#drum'), $('#drumRing'), {
   render: (d) => `<div class="dc" data-id="${d.id}">
       ${artHtml(d)}
-      <div class="dc-meta"><b>${esc(d.title)}</b><small>${esc(d.origin || levelTitle(d.level))}</small></div>
-      <span class="dc-open" aria-hidden="true">Обрати</span></div>`,
+      <div class="dc-meta"><small class="dc-kicker">${esc(d.origin || levelTitle(d.level))}</small><b>${esc(d.title)}</b><small class="dc-tip">${esc(d.masterTip)}</small></div>
+      <span class="dc-open" aria-hidden="true">Приміряти на зірці</span></div>`,
   onActive: (d) => {
-    $('#drumInfo').innerHTML = `<b>${esc(d.title)}</b><small class="master-tip"><span aria-hidden="true">💡</span> ${esc(d.masterTip)}</small><button class="btn btn-gold btn-sm" data-try="${d.id}">На мою зірку ↑</button>`;
+    $('#drumInfo').innerHTML = `<b>${esc(d.title)}</b><button class="btn btn-gold btn-sm" data-try="${d.id}">Приміряти на зірці ↑</button>`;
   },
   onOpen: (d) => tryDesign(d.id),
 });
@@ -345,7 +345,7 @@ $('#candleGo').addEventListener('click', (e) => {
   const b = e.currentTarget;
   b.classList.add('is-lit');
   setLightMode('candle', true);
-  setTimeout(() => { goSection('try'); toast('Світло свічки 🕯️ Покрути зірку'); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
+  setTimeout(() => { goSection('try'); toast('Вечір зі свічкою 🕯️ Покрути зірку'); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
 });
 
 /* ---------- міні-гід із 3 кроків (раз при першому відкритті; знову — кнопка «?») ---------- */

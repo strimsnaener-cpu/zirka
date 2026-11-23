@@ -80,7 +80,7 @@ export function initAmbientBg(canvas) {
     const cx = w / 2, cy = h / 2;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = 'source-over';
 
     // тонкі 3D-контури в глибині
     ctx.lineWidth = 1;

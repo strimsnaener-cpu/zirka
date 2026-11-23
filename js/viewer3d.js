@@ -17,6 +17,8 @@ import { DESIGN } from './ornaments.js';
 import { VILLAGE } from './village.js';
 import { traceAlpha, rasterize } from './trace.js';
 const UP = new THREE.Vector3(0, 1, 0);
+// денне студійне світло (світле ательє)
+const DAY = { sky: 0xfff6ea, ground: 0xd8c2a2, hemi: 1.15, key: 0xfff1dc, keyI: 2.3, rim: 0xffe6c8, rimI: 0.7, exposure: 1.0 };
 
 /* ---------- розміри ---------- */
 const HALF = STAR.sizeCm / 2;
@@ -236,7 +238,7 @@ export class Viewer {
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, MOBILE ? 1.25 : 1.5));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = DAY.exposure;
     r.shadowMap.enabled = !LOW;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.host.innerHTML = '';
@@ -245,8 +247,9 @@ export class Viewer {
     const scene = (this.scene = new THREE.Scene());
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 400);
 
-    const hemi = new THREE.HemisphereLight(0xc9dcff, 0x3a2614, 0.9); scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff0d8, 2.6);
+    // світла студія: м’яке денне «вікно» + теплий ключовий + легкий контровий (видно фаску, волокна й шари фарби)
+    const hemi = new THREE.HemisphereLight(DAY.sky, DAY.ground, DAY.hemi); scene.add(hemi);
+    const key = new THREE.DirectionalLight(DAY.key, DAY.keyI);
     key.position.set(8, 20, 22);
     key.castShadow = !LOW;
     key.shadow.mapSize.set(1024, 1024);
@@ -255,16 +258,16 @@ export class Viewer {
     key.shadow.normalBias = 0.02;
     scene.add(key);
     let rim = null;
-    if (!LOW) { rim = new THREE.DirectionalLight(0x9cc2ff, 1.3); rim.position.set(-12, 14, -14); scene.add(rim); }
+    if (!LOW) { rim = new THREE.DirectionalLight(DAY.rim, DAY.rimI); rim.position.set(-12, 14, -14); scene.add(rim); }
     const candle = new THREE.PointLight(0xffa860, 60, 40, 2); candle.position.set(0, 7, 10); scene.add(candle);
     this.L = { hemi, key, rim, candle };
 
+    // підставка «стоїть на столі»: м’яка контактна тінь завжди + справжня тінь від ключового світла (крім слабких GPU)
+    const blob = new THREE.Mesh(new THREE.PlaneGeometry(30, 16), new THREE.MeshBasicMaterial({ map: blobShadowTex(), transparent: true, depthWrite: false, opacity: LOW ? 1 : 0.7 }));
+    blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; scene.add(blob);
     if (!LOW) {
-      const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.ShadowMaterial({ opacity: 0.4 }));
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.ShadowMaterial({ opacity: 0.22, color: 0x4a3020 }));
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-    } else {
-      const blob = new THREE.Mesh(new THREE.PlaneGeometry(30, 16), new THREE.MeshBasicMaterial({ map: blobShadowTex(), transparent: true, depthWrite: false }));
-      blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; scene.add(blob);
     }
 
     /* ----- фото й текстури (кожне — необов’язкове) ----- */
@@ -361,6 +364,7 @@ export class Viewer {
     for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 50; pos[i * 3 + 1] = Math.random() * 42; pos[i * 3 + 2] = (Math.random() - 0.5) * 30 - 4; }
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.snow = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.42, map: dotTex(), transparent: true, depthWrite: false, opacity: 0.55, color: 0xfff1dc }));
+    this.snow.visible = this.light === 'candle';
     scene.add(this.snow);
 
     /* ----- керування: вільне обертання 360° ----- */
@@ -443,15 +447,16 @@ export class Viewer {
     const L = this.L;
     if (!L) return;
     const candle = mode === 'candle';
-    L.hemi.color.set(candle ? 0xffb07a : 0xc9dcff); L.hemi.groundColor.set(candle ? 0x2a1208 : 0x3a2614);
-    L.hemi.intensity = candle ? 0.22 : 0.9;
-    L.key.color.set(candle ? 0xffb27a : 0xfff0d8); L.key.intensity = candle ? 0.35 : 2.6;
-    if (L.rim) { L.rim.color.set(candle ? 0xff7a30 : 0x9cc2ff); L.rim.intensity = candle ? 0.5 : 1.3; }
+    L.hemi.color.set(candle ? 0xffb07a : DAY.sky); L.hemi.groundColor.set(candle ? 0x2a1208 : DAY.ground);
+    L.hemi.intensity = candle ? 0.22 : DAY.hemi;
+    L.key.color.set(candle ? 0xffb27a : DAY.key); L.key.intensity = candle ? 0.35 : DAY.keyI;
+    if (L.rim) { L.rim.color.set(candle ? 0xff7a30 : DAY.rim); L.rim.intensity = candle ? 0.5 : DAY.rimI; }
+    if (this.snow) this.snow.visible = candle; // сніжок — лише ввечері, на темному
     L.candle.color.set(candle ? 0xff9a42 : 0xffa860);
     L.candle.distance = candle ? 70 : 40;
     if (candle) L.candle.position.set(0, this.starY - 11, STAR_Z + 9);
     else { L.candle.position.set(0, 7, 10); L.candle.intensity = 60; }
-    this.renderer.toneMappingExposure = candle ? 1.18 : 1.05;
+    this.renderer.toneMappingExposure = candle ? 1.18 : DAY.exposure;
   }
   applyLook() {
     if (!this.ready) return;
@@ -559,7 +564,8 @@ export class Viewer {
       this.L.candle.intensity = 260 * (1 + 0.07 * Math.sin(t * 6.3) + 0.045 * Math.sin(t * 11.7 + 1.3) + 0.03 * Math.sin(t * 2.1));
     }
     // сніг
-    const p = this.snow.geometry.attributes.position;
+    const p = this.snow.visible ? this.snow.geometry.attributes.position : null;
+    if (p) {
     for (let i = 0; i < p.count; i++) {
       let y = p.getY(i) - dt * (0.9 + (i % 5) * 0.25);
       if (y < 0) y += 42;
@@ -567,6 +573,7 @@ export class Viewer {
       p.setX(i, p.getX(i) + Math.sin(this.t * 0.6 + i) * dt * 0.25);
     }
     p.needsUpdate = true;
+    }
     this.renderer.render(this.scene, this.camera);
     this.raf = requestAnimationFrame(this.loop);
   }
