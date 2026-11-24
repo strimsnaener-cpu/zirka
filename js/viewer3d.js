@@ -255,11 +255,9 @@ async function traceVillageSvg() {
   const px = traceAlpha(canvas);
   // масштаб — так, щоб силует хатинки з ялинками мав реальну ширину STAND.widthCm
   const xs = px.map(([x]) => x / VS);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const kv = STAND.widthCm / (x1 - x0);
+  const kv = STAND.widthCm / (Math.max(...xs) - Math.min(...xs));
   const W = VW * kv, H = VILLAGE_H * kv;
-  const mid = (x0 + x1) / 2; // силует рівно по центру основи (ширина 155 мм від −77,5 до +77,5)
-  return { pts: px.map(([x, y]) => [(x / VS - mid) * kv, (VILLAGE_H - y / VS) * kv]), W, H, fromPhoto: false, dx: (mid - VW / 2) * kv };
+  return { pts: px.map(([x, y]) => [(x / VS - VW / 2) * kv, (VILLAGE_H - y / VS) * kv]), W, H, fromPhoto: false };
 }
 /** з фото PNG із прозорим фоном — 1-в-1 з реальним виробом */
 async function traceVillagePhoto(tex) {
@@ -384,8 +382,7 @@ export class Viewer {
     if (!sil) sil = await traceVillageSvg();
     this.sil = sil;
     const minY = Math.min(...sil.pts.map((p) => p[1]));
-    const dx = sil.dx || 0; // зсув силуету до центру — текстура розпису зсувається разом із ним
-    const silGeo = plate(shapeFrom(sil.pts), SIL_T, SIL_CH, (x, y, front) => (front ? [(x + dx) / sil.W + 0.5, y / sil.H] : [x, y]));
+    const silGeo = plate(shapeFrom(sil.pts), SIL_T, SIL_CH, (x, y, front) => (front ? [x / sil.W + 0.5, y / sil.H] : [x, y]));
     const silMesh = (this.silMesh = new THREE.Mesh(silGeo, [this.m.silFront, this.m.white, this.m.white]));
     silMesh.position.set(0, FOOT_TOP - minY - 0.01, SIL_Z);
     add(silMesh);
@@ -397,17 +394,15 @@ export class Viewer {
     }
 
     /* ----- паличка 12,8 × 6,3 × 107 мм із заокругленим верхом; гвинтик-вісь і шайба ----- */
-    // паличка стоїть на основі (усередині замету), а заокруглений верх — на 9 мм вище гвинтика
-    const stickTop = STAR_Y + 0.9, stickLen = stickTop - FOOT_TOP;
+    const stickTop = STAR_Y + 0.9;
     const sb = 0.03;
-    const stickGeo = new THREE.ExtrudeGeometry(stickShape(STK.widthCm, stickLen), {
+    const stickGeo = new THREE.ExtrudeGeometry(stickShape(STK.widthCm, STK.lengthCm), {
       depth: STK.thicknessCm - 2 * sb, steps: 1, curveSegments: 10,
       bevelEnabled: true, bevelThickness: sb, bevelSize: sb, bevelOffset: -sb, bevelSegments: 1,
     });
     stickGeo.translate(0, 0, -(STK.thicknessCm - 2 * sb) / 2);
     const stick = add(new THREE.Mesh(stickGeo, this.m.stick));
-    stick.position.set(0, FOOT_TOP, STICK_Z);
-    stick.name = 'stick';
+    stick.position.set(0, stickTop - STK.lengthCm, STICK_Z);
     const cyl = (r1, r2, h, z, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, 20), mat); m.rotation.x = Math.PI / 2; m.position.set(0, STAR_Y, z); return add(m); };
     cyl(0.42, 0.42, STAND.washerCm, STICK_Z + STK.thicknessCm / 2 + STAND.washerCm / 2, this.m.metal); // шайба
     const back = STICK_Z - STK.thicknessCm / 2;
