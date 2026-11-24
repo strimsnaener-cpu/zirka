@@ -73,7 +73,7 @@ export function createTour(steps) {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('width', W); svg.setAttribute('height', H);
     const rr = (x, y, w, h, r) => `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 -${r} ${r}h-${w - 2 * r}a${r} ${r} 0 0 1 -${r} -${r}v-${h - 2 * r}a${r} ${r} 0 0 1 ${r} -${r}z`;
-    svg.querySelector('path').setAttribute('d', `M0 0H${W}V${H}H0Z ` + holes.map((h) => rr(h.x, h.y, h.w, h.h, Math.min(22, h.h / 2, h.w / 2))).join(' '));
+    svg.querySelector('path').setAttribute('d', `M0 0H${W}V${H}H0Z ` + holes.map((h) => rr(h.x, h.y, h.w, h.h, Math.min(2, h.h / 2, h.w / 2))).join(' '));
 
     const rings = root.querySelector('.tour-rings');
     while (rings.children.length < holes.length) rings.appendChild(document.createElement('i'));
