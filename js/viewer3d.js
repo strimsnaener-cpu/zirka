@@ -221,7 +221,8 @@ export class Viewer {
   constructor(host) {
     this.host = host;
     this.look = 'painted';
-    this.viewName = 'front';
+    this.viewName = 'fit';
+    this.spin = { vel: 0, drag: null };
     this.auto = true;
     this.touched = false; this.swayT = 0; this.swayOff = 0; // демо-покачування до першого дотику
     this.active = false;
@@ -372,13 +373,12 @@ export class Viewer {
     Object.assign(c, {
       enableDamping: true, dampingFactor: 0.08, enablePan: false,
       minDistance: 14, maxDistance: 95, rotateSpeed: 0.85, zoomSpeed: 0.8,
-      autoRotate: true, autoRotateSpeed: 1.6, minPolarAngle: 0.05, maxPolarAngle: Math.PI * 0.92,
+      autoRotate: false, autoRotateSpeed: 1.6, minPolarAngle: 0.05, maxPolarAngle: Math.PI * 0.92,
     });
     c.addEventListener('start', () => { this.dragging = true; this.tween = null; this.touched = true; });
-    // телефон: вертикальний свайп по зірці гортає сторінку, горизонтальний — крутить зірку
-    // (OrbitControls сам ставить touch-action:none — перевизначаємо після створення)
-    if (MOBILE) r.domElement.style.touchAction = 'pan-y';
     c.addEventListener('end', () => { this.dragging = false; this.resumeAt = this.t + 3; });
+    r.domElement.style.touchAction = 'none'; // сторінка не гортається — увесь жест належить 3D
+    this.initSpin(r.domElement);
 
     this.views = {
       front: { target: [0, starY, STAR_Z], dir: [0, 0.04, 1], dist: 44 },
@@ -473,8 +473,65 @@ export class Viewer {
   }
 
   /* ---------- ракурси (плавний переліт камери навколо цілі) ---------- */
+  /** ракурс «уся композиція»: зірка з підставкою цілком у кадрі за будь-яких пропорцій екрана */
+  fitView() {
+    const box = (this._box ||= new THREE.Box3().setFromObject(this.product));
+    const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+    const vf = THREE.MathUtils.degToRad(this.camera.fov) / 2;
+    const hf = Math.atan(Math.tan(vf) * this.camera.aspect);
+    const halfW = Math.hypot(size.x, size.z) / 2, halfH = size.y / 2;
+    const dist = Math.max(halfH / Math.tan(vf), halfW / Math.tan(hf)) * 1.06 + size.z / 2;
+    return { target: ctr.toArray(), dir: [0.2, 0.08, 1], dist };
+  }
+
+  /* жести: свайп по самій зірці — крутить її на осі, як вертушку; по фону — камера (OrbitControls) */
+  initSpin(el) {
+    const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), v = new THREE.Vector3();
+    const sp = this.spin;
+    this.onSpinDown = (e) => {
+      if (e.target !== el || sp.drag || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      const rect = el.getBoundingClientRect();
+      ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+      ray.setFromCamera(ndc, this.camera);
+      if (!ray.intersectObject(this.star, false).length) return; // фон — віддаємо камері
+      e.stopPropagation(); // OrbitControls цей дотик не отримає
+      this.star.getWorldPosition(v);
+      // дивимось на лице чи на зворот — від цього залежить напрям обертання
+      const facing = this.camera.position.z - v.z >= 0 ? 1 : -1;
+      const p = v.clone().project(this.camera);
+      sp.drag = { id: e.pointerId, cx: rect.left + ((p.x + 1) / 2) * rect.width, cy: rect.top + ((1 - p.y) / 2) * rect.height, x: e.clientX, y: e.clientY, t: performance.now(), facing };
+      sp.vel = 0;
+      this.dragging = true; this.touched = true; this.tween = null;
+      try { el.setPointerCapture(e.pointerId); } catch { /* ні — слухаємо window */ }
+    };
+    this.onSpinMove = (e) => {
+      const d = sp.drag;
+      if (!d || e.pointerId !== d.id) return;
+      const rx = d.x - d.cx, ry = d.y - d.cy, mx = e.clientX - d.x, my = e.clientY - d.y;
+      const r2 = rx * rx + ry * ry;
+      // кут повороту навколо центру зірки (екранна y — донизу), біля самого центру — за горизонтальним свайпом
+      const da = (r2 < 900 ? -mx / 70 : -(rx * my - ry * mx) / r2) * d.facing;
+      this.star.rotation.z += da;
+      const now = performance.now(), dt = Math.max(8, now - d.t) / 1000;
+      sp.vel = THREE.MathUtils.clamp(sp.vel * 0.5 + (da / dt) * 0.5, -22, 22);
+      d.x = e.clientX; d.y = e.clientY; d.t = now;
+    };
+    this.onSpinUp = (e) => {
+      const d = sp.drag;
+      if (!d || e.pointerId !== d.id) return;
+      if (performance.now() - d.t > 90) sp.vel = 0; // палець зупинився перед тим, як відпустити
+      sp.drag = null;
+      this.dragging = false;
+      this.resumeAt = this.t + 3;
+    };
+    addEventListener('pointerdown', this.onSpinDown, true);
+    addEventListener('pointermove', this.onSpinMove);
+    addEventListener('pointerup', this.onSpinUp);
+    addEventListener('pointercancel', this.onSpinUp);
+  }
+
   setView(name, instant = false) {
-    const v = this.views?.[name];
+    const v = name === 'fit' && this.product ? this.fitView() : this.views?.[name];
     if (!v) { this.viewName = name; return; }
     this.viewName = name;
     const t1 = new THREE.Vector3(...v.target);
@@ -499,6 +556,18 @@ export class Viewer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    if (this.viewName === 'fit' && this.product && this.controls) {
+      // екран змінив пропорції — та сама точка огляду, нова відстань, щоб усе влізло
+      const f = this.fitView();
+      const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+      if (!dir.lengthSq()) dir.fromArray(f.dir).normalize();
+      this.tween = null;
+      this.controls.target.fromArray(f.target);
+      this.camera.position.copy(this.controls.target).addScaledVector(dir, f.dist);
+      this.controls.minDistance = f.dist * 0.5;
+      this.controls.maxDistance = f.dist * 1.5;
+      this.controls.update();
+    }
     // setSize очищає буфер — одразу малюємо кадр, щоб полотно не блимало порожнім
     if (this.scene) this.renderer.render(this.scene, this.camera);
   }
@@ -518,6 +587,10 @@ export class Viewer {
   dispose() {
     this.setActive(false);
     document.removeEventListener('visibilitychange', this.onVis);
+    removeEventListener('pointerdown', this.onSpinDown, true);
+    removeEventListener('pointermove', this.onSpinMove);
+    removeEventListener('pointerup', this.onSpinUp);
+    removeEventListener('pointercancel', this.onSpinUp);
     this.ro?.disconnect();
     this.controls?.dispose();
     Object.values(this.tex).forEach((t) => t?.dispose());
@@ -557,7 +630,23 @@ export class Viewer {
       this.camera.position.copy(this.controls.target).add(this._sv);
       this.swayOff = off;
       this.controls.autoRotate = false;
-    } else this.controls.autoRotate = this.auto && !this.dragging && !this.tween && this.t > this.resumeAt;
+    } else if (this.auto && this.touched && !this.dragging && !this.tween && this.t > this.resumeAt + 4) {
+      // 7 с без дотиків — камера сама повертається до лиця зірки й знову легко погойдується
+      this.setView('fit');
+      this.touched = false; this.swayT = 0; this.swayOff = 0;
+    }
+    // зірка-вертушка: після свайпу ще крутиться за інерцією й плавно зупиняється
+    const sp = this.spin;
+    if (!sp.drag && sp.vel) {
+      this.star.rotation.z += sp.vel * dt;
+      sp.vel *= Math.exp(-dt * 0.9);
+      if (Math.abs(sp.vel) < 0.02) sp.vel = 0;
+    }
+    // майже зупинилась — м’яко «клацає» в найближче рівне положення (8 променів → крок 45°)
+    if (!sp.drag && Math.abs(sp.vel) < 0.8) {
+      const z = this.star.rotation.z, snap = Math.round(z / (Math.PI / 4)) * (Math.PI / 4);
+      if (Math.abs(snap - z) > 1e-4) this.star.rotation.z += (snap - z) * (1 - Math.exp(-dt * 5));
+    }
     this.controls.update(dt);
     if (this.light === 'candle') { // живе полум’я: кілька повільних хвиль, без різких спалахів
       const t = this.t;
