@@ -117,7 +117,7 @@ export function starHandmade(designId, colors, { idp = 'hm', seed = 3 } = {}) {
   </filter>
   <filter id="${idp}-pf" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
     <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="${seed + 1}" result="wob"/>
-    <feDisplacementMap in="SourceGraphic" in2="wob" scale="1.5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feDisplacementMap in="SourceGraphic" in2="wob" scale=".35" xChannelSelector="R" yChannelSelector="G" result="d"/>
     <feTurbulence type="fractalNoise" baseFrequency="0.32 0.08" numOctaves="2" seed="${seed + 2}" result="brush"/>
     <feDiffuseLighting in="brush" surfaceScale="1.1" lighting-color="#fff" result="lit"><feDistantLight azimuth="235" elevation="58"/></feDiffuseLighting>
     <feComponentTransfer in="lit" result="soft"><feFuncR type="linear" slope=".2" intercept=".84"/><feFuncG type="linear" slope=".2" intercept=".84"/><feFuncB type="linear" slope=".2" intercept=".84"/></feComponentTransfer>

@@ -11,7 +11,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ASSETS, STAR, STAND } from './config.js';
-import { starPoints, openingPolygon } from './geometry.js';
+import { starPoints } from './geometry.js';
+import { windowPolys, cutPolys, frontOutline } from './carve.js';
 import { starOnly, villageOnly, VILLAGE_H } from './compose.js';
 import { DESIGN } from './ornaments.js';
 import { VILLAGE } from './village.js';
@@ -44,7 +45,7 @@ const METAL = '#005CFF', PLAIN = '#00FF00';
 /* телефон / слабкий пристрій: менше пікселів, без динамічних тіней, менше снігу */
 const MOBILE = matchMedia('(max-width: 768px), (pointer: coarse)').matches;
 const LOW = MOBILE || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
-const TEX = LOW ? 768 : 1024;
+const TEX = LOW ? 1024 : 2048; // чіткі грані розпису навіть зблизька
 
 /** м’яка «запечена» тінь під підставкою — замість карти тіней на слабких пристроях */
 function blobShadowTex() {
@@ -145,63 +146,43 @@ function metalColors(obj, colors) {
 const hasGold = (obj, colors) => Object.keys(obj.slots).some((s) => (colors[s] || obj.slots[s].def) === 'gold');
 
 /* ---------- геометрія ---------- */
-function starShape() {
-  const sh = new THREE.Shape();
-  starPoints().forEach(([x, y], i) => (i ? sh.lineTo(x * K, -y * K) : sh.moveTo(x * K, -y * K)));
-  sh.closePath();
-  for (let k = 0; k < 8; k++) {
-    const p = new THREE.Path();
-    openingPolygon(k, 10).forEach(([x, y], i) => (i ? p.lineTo(x * K, -y * K) : p.moveTo(x * K, -y * K)));
-    p.closePath();
-    sh.holes.push(p);
-  }
-  return sh;
-}
-/* ---------- передній ажурний шар: білий, із наскрізними вирізами ----------
-   ті самі 8 вікон, що й у фанері + центральна 8-пелюсткова квітка-сніжинка
-   + у кожному з 8 променів — пташка і гілочка з трьох листочків.
-   Крізь вирізи видно берёзову фанеру заднього шару. Одиниці — SVG зірки (R = 100, y — донизу). */
-const rotP = ([x, y], deg) => { const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; };
-function bez(p0, p1, p2, p3, n = 6) {
-  const out = [];
-  for (let i = 1; i <= n; i++) {
-    const t = i / n, u = 1 - t;
-    out.push([u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]);
-  }
-  return out;
-}
-/** пелюстка-крапля: основа в (0,0), росте вгору на len */
-const petalPts = (len, wid) => { const w = wid / 2; return [[0, 0], ...bez([0, 0], [w * 1.6, -len * 0.3], [w * 1.1, -len * 0.85], [0, -len]), ...bez([0, -len], [-w * 1.1, -len * 0.85], [-w * 1.6, -len * 0.3], [0, 0]).slice(0, -1)]; };
-/** листочок-«човник» */
-const leafPts = (len, wid) => [[0, 0], ...bez([0, 0], [wid * 0.66, -len * 0.33], [wid * 0.66, -len * 0.66], [0, -len], 5), ...bez([0, -len], [-wid * 0.66, -len * 0.66], [-wid * 0.66, -len * 0.33], [0, 0], 5).slice(0, -1)];
-/** стилізована пташка (дзьоб праворуч), центр у (0,0) */
-const BIRD = [[-9.5, -2.2], [-6, -1.3], [-3, -2.5], [0, -3.4], [2.5, -4.4], [4.6, -4.7], [6.2, -3.7], [9, -2.6], [6.3, -1.6], [4.6, 0.2], [1.6, 2.4], [-2, 2.6], [-5, 1.5], [-9.5, 1.3], [-7, -0.4]];
-const place = (pts, dx, dy, rot = 0) => pts.map((p) => { const [x, y] = rotP(p, rot); return [x + dx, y + dy]; });
-function openworkHoles() {
-  const holes = [];
-  for (let k = 0; k < 8; k++) holes.push(openingPolygon(k, 10));
-  for (let k = 0; k < 8; k++) {
-    const a = 45 * k + STAR.rotateDeg, dir = k % 2 ? -1 : 1;
-    [
-      place(petalPts(11.5, 5), 0, -6), // пелюстка квітки-сніжинки (по осі променя)
-      BIRD.map(([x, y]) => [x * dir, y - 61]), // пташка — по черзі дивиться ліворуч / праворуч
-      place(leafPts(8, 3.4), -1.5, -71, -32), // гілочка: два листочки навскіс
-      place(leafPts(8, 3.4), 1.5, -71, 32),
-      place(leafPts(8.5, 2.6), 0, -79.5), // і верхній листочок
-    ].forEach((h) => holes.push(h.map((pt) => rotP(pt, a))));
-  }
-  return holes;
-}
+/* ---------- зірка з двох шарів. Вирізи — з carve.js (те саме джерело, що й розпис) ---------- */
 function polyPath(pts, P = THREE.Path) {
   const p = new P();
   pts.forEach(([x, y], i) => (i ? p.lineTo(x * K, -y * K) : p.moveTo(x * K, -y * K)));
   p.closePath();
   return p;
 }
-function openworkShape() {
-  const sh = polyPath(starPoints(STAR.frontInset), THREE.Shape);
-  openworkHoles().forEach((h) => sh.holes.push(polyPath(h)));
+/** задній шар — берёзова фанера: контур зірки + 8 наскрізних віконець */
+function starShape() {
+  const sh = polyPath(starPoints(), THREE.Shape);
+  windowPolys().forEach((w) => sh.holes.push(polyPath(w)));
   return sh;
+}
+/** передній ажурний шар: ті самі віконця + щілинки квітки й листочки гілочок (крізь них видно фанеру) */
+function openworkShape() {
+  const sh = polyPath(frontOutline(), THREE.Shape);
+  [...windowPolys(), ...cutPolys()].forEach((h) => sh.holes.push(polyPath(h)));
+  return sh;
+}
+/** «запечене» м’яке затінення в заглибинах рельєфу (AO): нижче за сусідів — темніше.
+    Розмиття — через зменшення й збільшення (працює всюди, і в Safari) */
+function aoCanvas(relief, strength = 2.4) {
+  const w = relief.width, h = relief.height;
+  const sm = document.createElement('canvas'); sm.width = Math.max(1, w >> 4); sm.height = Math.max(1, h >> 4);
+  const sg = sm.getContext('2d'); sg.imageSmoothingQuality = 'high'; sg.drawImage(relief, 0, 0, sm.width, sm.height);
+  const bl = document.createElement('canvas'); bl.width = w; bl.height = h;
+  const bg = bl.getContext('2d', { willReadFrequently: true }); bg.imageSmoothingQuality = 'high'; bg.drawImage(sm, 0, 0, w, h);
+  const src = relief.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data, blur = bg.getImageData(0, 0, w, h).data;
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const og = out.getContext('2d'), id = og.createImageData(w, h), o = id.data;
+  for (let i = 0; i < o.length; i += 4) {
+    const d = Math.max(0, blur[i] - src[i]) / 255;
+    const v = Math.max(0.5, 1 - d * strength);
+    o[i] = 255 * v; o[i + 1] = 255 * (v * 0.97 + 0.03); o[i + 2] = 255 * (v * 0.92 + 0.08); o[i + 3] = 255;
+  }
+  og.putImageData(id, 0, 0);
+  return out;
 }
 /** основа підставки: заокруглений прямокутник + півкруглий виступ-замет спереду (у фігурі y = −z) */
 function footShape(W, D, r, rb) {
@@ -326,7 +307,8 @@ export class Viewer {
     const key = new THREE.DirectionalLight(DAY.key, DAY.keyI);
     key.position.set(7, 16, 17);
     key.castShadow = !LOW;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.radius = 3;
     Object.assign(key.shadow.camera, { left: -11, right: 11, top: 19, bottom: -3, near: 1, far: 50 });
     key.shadow.bias = -0.0006;
     key.shadow.normalBias = 0.02;
@@ -340,7 +322,7 @@ export class Viewer {
     const blob = new THREE.Mesh(new THREE.PlaneGeometry(22, 11), new THREE.MeshBasicMaterial({ map: blobShadowTex(), transparent: true, depthWrite: false, opacity: LOW ? 1 : 0.7 }));
     blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; scene.add(blob);
     if (!LOW) {
-      const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.ShadowMaterial({ opacity: 0.22, color: 0x4a3020 }));
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.ShadowMaterial({ opacity: 0.3, color: 0x4a3020 }));
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
     }
 
@@ -373,7 +355,7 @@ export class Viewer {
       stick: std({ map: faceCm, color: 0xd9a86c, roughness: 0.8 }), // паличка — тепліше й темніше за фанеру
       metal: std({ color: 0xbdb6aa, metalness: 0.85, roughness: 0.38 }),
       dark: std({ color: 0x2b2420, roughness: 0.9 }),
-      silFront: std({ ...gypsum, color: 0xffffff }),
+      silFront: std({ ...gypsum, color: 0xfbfaf6 }),
     };
 
     const product = (this.product = new THREE.Group());
@@ -407,7 +389,8 @@ export class Viewer {
     if (!pv) {
       const relief = await rasterize(villageOnly(VILLAGE_RELIEF, { idp: 'vb', bare: false }), VW * 2, VILLAGE_H * 2, '#000');
       this.m.silFront.bumpMap = dataTex(relief);
-      this.m.silFront.bumpScale = 1.6;
+      this.m.silFront.bumpScale = 3.2; // чіткі грані даху, стін, віконець і ялинок
+      this.ao = aoCanvas(relief); // м’які тіні в заглибинах — хатинка не зливається з папером
     }
 
     /* ----- паличка 12,8 × 6,3 × 107 мм із заокругленим верхом; гвинтик-вісь і шайба ----- */
@@ -505,11 +488,17 @@ export class Viewer {
     const sGold = hasGold(d, sc) && (!starLayers || [...starLayers].length), vGold = hasGold(VILLAGE, vc);
     const [star, starM, vil, vilM] = await Promise.all([
       rasterize(starOnly(state.star.designId, sc, { idp: 'tx', bare: false, layers: starLayers }), TEX, TEX, '#F1EDE4'),
-      sGold ? rasterize(metalSvg(starOnly(state.star.designId, metalColors(d, sc), { idp: 'tm', bare: false, layers: starLayers })), 512, 512, PLAIN) : null,
+      sGold ? rasterize(metalSvg(starOnly(state.star.designId, metalColors(d, sc), { idp: 'tm', bare: false, layers: starLayers })), TEX / 2, TEX / 2, PLAIN) : null,
       rasterize(villageOnly(vc, { idp: 'vx', bare: true, layers: villageLayers }), VW * VS, VILLAGE_H * VS, VILLAGE.bare.fill),
       vGold ? rasterize(metalSvg(villageOnly(metalColors(VILLAGE, vc), { idp: 'vm', bare: false, layers: villageLayers })), VW * 2, VILLAGE_H * 2, PLAIN) : null,
     ]);
     if (job !== this.job) return; // уже прийшов новіший стан
+    if (this.ao) { // затінення заглибин поверх розпису підставки
+      const g = vil.getContext('2d');
+      g.globalCompositeOperation = 'multiply';
+      g.drawImage(this.ao, 0, 0, vil.width, vil.height);
+      g.globalCompositeOperation = 'source-over';
+    }
     const aniso = this.renderer.capabilities.getMaxAnisotropy();
     const next = { star: canvasTex(star), starM: starM && dataTex(starM), vil: canvasTex(vil), vilM: vilM && dataTex(vilM) };
     next.star.anisotropy = next.vil.anisotropy = aniso;

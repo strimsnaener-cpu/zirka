@@ -65,15 +65,16 @@ svg { flex: none; }
 /* ---------- шапка ---------- */
 .brand { display: inline-flex; align-items: center; gap: 9px; min-width: 0; color: var(--ink); }
 .brand-mark { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: .9; stroke-linejoin: round; }
-.brand-t { font: 600 19px/1 var(--serif); font-variant: small-caps; letter-spacing: .07em; white-space: nowrap; }
-.brand-t em { font-style: italic; font-variant: normal; font-weight: 500; letter-spacing: .01em; }
+.brand-t { font: 600 18px/1 var(--serif); letter-spacing: .1em; white-space: nowrap; }
 .top-r { display: flex; align-items: center; gap: 4px; flex: none; }
 .light { display: inline-flex; align-items: center; }
-.light button { position: relative; min-height: 44px; padding: 0 8px; border: 0; background: none; font: 600 14px var(--sans); color: var(--sepia); white-space: nowrap; transition: color .3s; }
-.light button::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 9px; height: 1.5px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform .35s var(--ease); }
-.light button.is-on { color: var(--ink); }
+.light button { position: relative; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border: 0; background: none;
+  font: 20px/1 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
+.light button span { opacity: .62; filter: grayscale(.55); transition: opacity .3s, filter .3s; }
+.light button::after { content: ''; position: absolute; left: 11px; right: 11px; bottom: 5px; height: 1.5px; background: var(--ink); transform: scaleX(0); transform-origin: left; transition: transform .35s var(--ease); }
+.light button.is-on span { opacity: 1; filter: none; }
 .light button.is-on::after { transform: scaleX(1); }
-.light-sep { color: var(--line); font: 400 20px var(--serif); }
+.light-sep { color: var(--line); font: 400 20px var(--serif); margin: 0 -2px; }
 .help-btn { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--ink); background: none;
   color: var(--ink); font: italic 600 21px/1 var(--serif); }
 
@@ -101,8 +102,6 @@ svg { flex: none; }
 .viewer canvas { display: block; width: 100% !important; height: 100% !important; animation: develop 1.4s .35s ease both; }
 @keyframes develop { from { opacity: 0; } }
 .viewer-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sepia); font: italic 500 20px var(--serif); }
-.caption { position: absolute; left: 12px; top: 8px; margin: 0; pointer-events: none; font: italic 500 15px/1.2 var(--serif); color: var(--sepia); }
-.caption span { font-style: normal; font-variant: small-caps; letter-spacing: .04em; }
 .spin-btn { position: absolute; right: 10px; bottom: 10px; z-index: 2; min-height: 44px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px 0 10px;
   border: 1px solid var(--ink); border-radius: 2px; background: var(--paper); color: var(--ink); font: 600 13.5px var(--sans); transition: background-color .8s ease, color .3s; }
 .spin-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: transform .6s var(--ease); }
@@ -197,24 +196,26 @@ svg { flex: none; }
 .top > .top-r { animation-delay: .15s; }
 .stage-card { animation: fadeIn .6s .1s ease both; }
 .crop { animation: fadeIn .5s .45s ease both; }
-.caption, .spin-btn { animation: fadeIn .6s .9s ease both; }
+.spin-btn { animation: fadeIn .6s .9s ease both; }
 .tabs { animation: inkIn .9s .3s var(--ease) both; }
 .pane:not([hidden]) { animation: fadeIn .6s .55s ease both; }
 
 /* ---------- розміри екранів ---------- */
 @media (max-width: 420px) {
   :root { --gut: 12px; }
-  .brand-t { font-size: 17px; }
-  .brand-t em { display: block; margin-top: 1px; }
-  .light button { padding: 0 6px; font-size: 13.5px; }
-  .light button::after { left: 6px; right: 6px; }
-  .caption span { display: none; }
+  .brand-t { font-size: 16px; letter-spacing: .07em; }
+  .brand { gap: 7px; }
+  .brand-mark { width: 20px; height: 20px; }
 }
 @media (max-width: 350px) {
   .brand-mark { display: none; }
   :root { --paint: 48px; }
   .paints { gap: 9px; }
-  .caption { display: none; }
+}
+/* вузький телефон: логотип в один рядок без значка */
+@media (max-width: 380px) {
+  .brand-mark { display: none; }
+  .brand-t { font-size: 15px; letter-spacing: .05em; }
 }
 /* низький екран — компактніший док, сцена лишається */
 @media (max-height: 640px) {
@@ -228,11 +229,10 @@ svg { flex: none; }
 @media (min-width: 900px) {
   :root { --top: 72px; --card: 82px; --pane: 156px; --paint: 60px; --gut: 32px; }
   .brand-mark { width: 28px; height: 28px; }
-  .brand-t { font-size: 23px; }
+  .brand-t { font-size: 22px; letter-spacing: .14em; }
   .stage { padding: 16px calc(var(--gut) + 10px) 18px; }
   .dock { width: min(880px, calc(100% - 64px)); padding-left: 0; padding-right: 0; padding-bottom: calc(20px + var(--safe-b)); }
   .paints { gap: 22px; }
-  .caption { left: 16px; top: 12px; font-size: 17px; }
   .spin-btn { right: 14px; bottom: 14px; }
   .card:hover:not(.is-on) { border-color: var(--sepia); }
   .tabs button:hover:not(.is-on), .part:hover:not(.is-on), .light button:hover:not(.is-on) { color: var(--ink); }

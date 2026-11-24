@@ -1,12 +1,12 @@
 /* Простий стан застосунку + збереження вибору в localStorage (якщо дозволено). */
-import { DESIGN, presetColors } from './ornaments.js';
+import { DESIGN, DESIGNS, presetColors } from './ornaments.js';
 import { VILLAGE } from './village.js';
 
-const KEY = 'lava-star-v2'; // v2: підставка за замовчуванням біла, як із коробки
+const KEY = 'lava-star-v3'; // v3: одна справжня різьба зірки, ідеї — поєднання фарб
 const listeners = new Set();
 
 function defaults() {
-  const d = DESIGN.petrykivka;
+  const d = DESIGNS[0];
   return {
     view: 'showcase',
     object: 'star',
@@ -14,7 +14,7 @@ function defaults() {
     level: d.level,
     star: { designId: d.id, preset: 'classic', colors: presetColors(d, 'classic') },
     village: { variantId: 'bare', colors: Object.fromEntries(Object.keys(VILLAGE.slots).map((k) => [k, 'white'])) },
-    selected: { star: 'petal', village: 'walls' },
+    selected: { star: 'edge', village: 'walls' },
     paint: { step: -1, guides: true, dry: null, target: 'star' },
     look: 'painted',
   };
