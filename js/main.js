@@ -140,7 +140,7 @@ const RING = 'M31 3.5C47.5 3 57.5 15 56.5 30.5C55.5 46.5 43.5 57 28 56.5C12.5 56
 const tint = (id) => (id === 'gold' ? '#C29A45' : PAINT[id]?.hex || id);
 const dabSvg = (id, rot = 0, cls = 'dab') =>
   `<svg class="${cls}" viewBox="0 0 60 60" aria-hidden="true"><g transform="rotate(${rot} 30 30)"><path class="dab-f" d="${DAB}" fill="${tint(id)}"/>${RIDGES}<path class="dab-o" d="${DAB}"/></g></svg>`;
-const ROT = { black: -14, red: 22, white: 64, green: -38, gold: 102 };
+const ROT = { black: -14, red: 22, white: 64, gold: 102, brown: -66, green: -38 };
 const VPARTS = ['trees', 'roof']; // підставку фарбують лише за бажанням: ялинки й дах
 const VLABEL = { trees: 'Ялинки', roof: 'Дах' };
 let vSlot = null; // null — фарбуємо зірку; інакше — деталь підставки

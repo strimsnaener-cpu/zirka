@@ -206,11 +206,14 @@ svg { flex: none; }
   .brand-t { font-size: 16px; letter-spacing: .07em; }
   .brand { gap: 7px; }
   .brand-mark { width: 20px; height: 20px; }
+  :root { --paint: 46px; } /* 6 фарб у ряд на телефоні */
+  .paints { gap: 10px; }
+  .pn { font-size: 9.5px; letter-spacing: 0; }
 }
 @media (max-width: 350px) {
   .brand-mark { display: none; }
-  :root { --paint: 48px; }
-  .paints { gap: 9px; }
+  :root { --paint: 44px; }
+  .paints { gap: 8px; }
 }
 /* вузький телефон: логотип в один рядок без значка */
 @media (max-width: 380px) {
@@ -232,7 +235,7 @@ svg { flex: none; }
   .brand-t { font-size: 22px; letter-spacing: .14em; }
   .stage { padding: 16px calc(var(--gut) + 10px) 18px; }
   .dock { width: min(880px, calc(100% - 64px)); padding-left: 0; padding-right: 0; padding-bottom: calc(20px + var(--safe-b)); }
-  .paints { gap: 22px; }
+  .paints { gap: 20px; }
   .spin-btn { right: 14px; bottom: 14px; }
   .card:hover:not(.is-on) { border-color: var(--sepia); }
   .tabs button:hover:not(.is-on), .part:hover:not(.is-on), .light button:hover:not(.is-on) { color: var(--ink); }

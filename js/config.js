@@ -58,13 +58,14 @@ export const ASSETS = {
   ],
 };
 
-/* ---------- 2. Фарби набору (рівно 5) ----------------------------------- */
+/* ---------- 2. Фарби набору (6, у такому порядку на сторінці) ------------- */
 export const PAINTS = [
   { id: 'black', name: 'Чорний', hex: '#1C1C1C', dark: '#0d0d0d' },
   { id: 'red', name: 'Червоний', hex: '#B8292F', dark: '#8a1d22' },
   { id: 'white', name: 'Білий', hex: '#F8F6F0', dark: '#d9d5ca' },
-  { id: 'green', name: 'Зелений', hex: '#1F4E3D', dark: '#143528' },
   { id: 'gold', name: 'Золотий', hex: '#D4AF37', dark: '#9c7a1b', metallic: true },
+  { id: 'brown', name: 'Коричневий', hex: '#6B4226', dark: '#4a2c18' },
+  { id: 'green', name: 'Зелений', hex: '#1F4E3D', dark: '#143528' },
 ];
 export const PAINT = Object.fromEntries(PAINTS.map((p) => [p.id, p]));
 
