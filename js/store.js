@@ -1,8 +1,8 @@
 /* Простий стан застосунку + збереження вибору в localStorage (якщо дозволено). */
 import { DESIGN, presetColors } from './ornaments.js';
-import { VILLAGE_VARIANTS } from './village.js';
+import { VILLAGE } from './village.js';
 
-const KEY = 'lava-star-v1';
+const KEY = 'lava-star-v2'; // v2: підставка за замовчуванням біла, як із коробки
 const listeners = new Set();
 
 function defaults() {
@@ -13,7 +13,7 @@ function defaults() {
     mode: 'create',
     level: d.level,
     star: { designId: d.id, preset: 'classic', colors: presetColors(d, 'classic') },
-    village: { variantId: 'snowy', colors: { ...VILLAGE_VARIANTS[0].colors } },
+    village: { variantId: 'bare', colors: Object.fromEntries(Object.keys(VILLAGE.slots).map((k) => [k, 'white'])) },
     selected: { star: 'petal', village: 'walls' },
     paint: { step: -1, guides: true, dry: null, target: 'star' },
     look: 'painted',
@@ -32,7 +32,7 @@ function load() {
       s.level = d.level;
       s.selected.star = Object.keys(d.slots)[0];
     }
-    if (saved.village && VILLAGE_VARIANTS.some((v) => v.id === saved.village.variantId)) s.village = { ...s.village, ...saved.village };
+    if (saved.village?.colors) s.village = { ...s.village, colors: { ...s.village.colors, ...saved.village.colors } };
   } catch { /* приватний режим — просто без збереження */ }
   return s;
 }

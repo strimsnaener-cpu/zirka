@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ASSETS, STAR, STAND } from './config.js';
 import { starPoints, openingPolygon } from './geometry.js';
-import { starOnly, villageOnly, VILLAGE_H, COMP } from './compose.js';
+import { starOnly, villageOnly, VILLAGE_H } from './compose.js';
 import { DESIGN } from './ornaments.js';
 import { VILLAGE } from './village.js';
 import { traceAlpha, rasterize } from './trace.js';
@@ -20,26 +20,27 @@ const UP = new THREE.Vector3(0, 1, 0);
 // денне студійне світло (світле ательє)
 const DAY = { sky: 0xfff6ea, ground: 0xd8c2a2, hemi: 1.15, key: 0xfff1dc, keyI: 2.3, rim: 0xffe6c8, rimI: 0.7, exposure: 1.0 };
 
-/* ---------- розміри ---------- */
+/* ---------- розміри (реальний виріб, см) ---------- */
 const HALF = STAR.sizeCm / 2;
 const K = HALF / STAR.R; // см на одиницю SVG зірки
-const T = STAR.thicknessCm;
-const CH = Math.min(STAR.chamferCm, T * 0.3);
-const KV = STAR.sizeCm / (2 * STAR.R * COMP.star.s); // см на одиницю макета села (як у майстерні)
+const T_BACK = STAR.backCm, T_FRONT = STAR.frontCm;
+const T = T_BACK + T_FRONT; // 6,2 мм
+const CH = STAR.chamferCm;
 const VW = 220, VS = 4; // макет села: 220 × VILLAGE_H од., растр 4 px/од.
 
 const FOOT = STAND.foot;
 const FOOT_TOP = FOOT.thicknessCm;
 const SIL_T = STAND.thicknessCm;
-const SIL_CH = Math.min(0.025, SIL_T * 0.2);
-const SIL_Z = -FOOT.depthCm / 2 + 1.3;
-const SIL_BOTTOM = FOOT_TOP - STAND.groove.depthCm;
+const SIL_CH = 0.04;
+const SIL_Z = -FOOT.depthCm / 2 + 0.8 + SIL_T / 2; // хатинка — ближче до заднього краю основи
 const STK = STAND.stick;
-const STICK_Z = SIL_Z + SIL_T / 2 + STK.frontOffsetCm + STK.thicknessCm / 2;
-const STAR_Z = STICK_Z + STK.thicknessCm / 2 + T / 2 + 0.01;
+const STICK_Z = FOOT.depthCm / 2 + STAND.drift.offsetCm; // паличка — у заметі на півкруглому виступі
+const STAR_Z = STICK_Z + STK.thicknessCm / 2 + STAND.washerCm; // задня площина зірки
+const STAR_Y = STAND.totalHeightCm - HALF; // центр зірки: верхній кінчик = 165 мм
 
 /* «технічні» кольори для карти металу: B = металевість, G = шорсткість */
-const METAL = '#0073D9', PLAIN = '#00FF00';
+// G = шорсткість, B = металевість: золото 0,28 / 0,65, решта — матовий акрил
+const METAL = '#005CFF', PLAIN = '#00FF00';
 /* телефон / слабкий пристрій: менше пікселів, без динамічних тіней, менше снігу */
 const MOBILE = matchMedia('(max-width: 768px), (pointer: coarse)').matches;
 const LOW = MOBILE || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
@@ -70,12 +71,12 @@ function woodCanvas(size = 512) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d');
-  g.fillStyle = '#e2c08b'; g.fillRect(0, 0, size, size);
+  g.fillStyle = '#e9d4ad'; g.fillRect(0, 0, size, size); // світла береза
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (let i = 0; i < 110; i++) {
     const y = rnd() * size;
-    g.strokeStyle = `rgba(${150 + rnd() * 40},${100 + rnd() * 30},50,${0.05 + rnd() * 0.1})`;
+    g.strokeStyle = `rgba(${165 + rnd() * 30},${120 + rnd() * 25},70,${0.04 + rnd() * 0.07})`;
     g.lineWidth = 0.6 + rnd() * 2.4;
     g.beginPath();
     for (let x = -32; x <= size + 32; x += 32) g.lineTo(x, y + Math.sin(x / 70 + i) * 4 + (rnd() - 0.5) * 2);
@@ -136,7 +137,7 @@ function applyCalib(t, c = {}) {
 }
 /** SVG → карта металу/шорсткості: золоті слоти = METAL, усе інше = PLAIN */
 function metalSvg(svg) {
-  return svg.replace('<svg ', `<svg style="fill:${PLAIN}" `).replace(/(fill|stroke)="(?!none|#0073D9)[^"]*"/g, `$1="${PLAIN}"`);
+  return svg.replace('<svg ', `<svg style="fill:${PLAIN}" `).replace(/(fill|stroke)="(?!none|#005CFF)[^"]*"/g, `$1="${PLAIN}"`);
 }
 function metalColors(obj, colors) {
   return Object.fromEntries(Object.keys(obj.slots).map((s) => [s, (colors[s] || obj.slots[s].def) === 'gold' ? METAL : PLAIN]));
@@ -156,6 +157,75 @@ function starShape() {
   }
   return sh;
 }
+/* ---------- передній ажурний шар: білий, із наскрізними вирізами ----------
+   ті самі 8 вікон, що й у фанері + центральна 8-пелюсткова квітка-сніжинка
+   + у кожному з 8 променів — пташка і гілочка з трьох листочків.
+   Крізь вирізи видно берёзову фанеру заднього шару. Одиниці — SVG зірки (R = 100, y — донизу). */
+const rotP = ([x, y], deg) => { const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; };
+function bez(p0, p1, p2, p3, n = 6) {
+  const out = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push([u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]);
+  }
+  return out;
+}
+/** пелюстка-крапля: основа в (0,0), росте вгору на len */
+const petalPts = (len, wid) => { const w = wid / 2; return [[0, 0], ...bez([0, 0], [w * 1.6, -len * 0.3], [w * 1.1, -len * 0.85], [0, -len]), ...bez([0, -len], [-w * 1.1, -len * 0.85], [-w * 1.6, -len * 0.3], [0, 0]).slice(0, -1)]; };
+/** листочок-«човник» */
+const leafPts = (len, wid) => [[0, 0], ...bez([0, 0], [wid * 0.66, -len * 0.33], [wid * 0.66, -len * 0.66], [0, -len], 5), ...bez([0, -len], [-wid * 0.66, -len * 0.66], [-wid * 0.66, -len * 0.33], [0, 0], 5).slice(0, -1)];
+/** стилізована пташка (дзьоб праворуч), центр у (0,0) */
+const BIRD = [[-9.5, -2.2], [-6, -1.3], [-3, -2.5], [0, -3.4], [2.5, -4.4], [4.6, -4.7], [6.2, -3.7], [9, -2.6], [6.3, -1.6], [4.6, 0.2], [1.6, 2.4], [-2, 2.6], [-5, 1.5], [-9.5, 1.3], [-7, -0.4]];
+const place = (pts, dx, dy, rot = 0) => pts.map((p) => { const [x, y] = rotP(p, rot); return [x + dx, y + dy]; });
+function openworkHoles() {
+  const holes = [];
+  for (let k = 0; k < 8; k++) holes.push(openingPolygon(k, 10));
+  for (let k = 0; k < 8; k++) {
+    const a = 45 * k + STAR.rotateDeg, dir = k % 2 ? -1 : 1;
+    [
+      place(petalPts(11.5, 5), 0, -6), // пелюстка квітки-сніжинки (по осі променя)
+      BIRD.map(([x, y]) => [x * dir, y - 61]), // пташка — по черзі дивиться ліворуч / праворуч
+      place(leafPts(8, 3.4), -1.5, -71, -32), // гілочка: два листочки навскіс
+      place(leafPts(8, 3.4), 1.5, -71, 32),
+      place(leafPts(8.5, 2.6), 0, -79.5), // і верхній листочок
+    ].forEach((h) => holes.push(h.map((pt) => rotP(pt, a))));
+  }
+  return holes;
+}
+function polyPath(pts, P = THREE.Path) {
+  const p = new P();
+  pts.forEach(([x, y], i) => (i ? p.lineTo(x * K, -y * K) : p.moveTo(x * K, -y * K)));
+  p.closePath();
+  return p;
+}
+function openworkShape() {
+  const sh = polyPath(starPoints(STAR.frontInset), THREE.Shape);
+  openworkHoles().forEach((h) => sh.holes.push(polyPath(h)));
+  return sh;
+}
+/** основа підставки: заокруглений прямокутник + півкруглий виступ-замет спереду (у фігурі y = −z) */
+function footShape(W, D, r, rb) {
+  const s = new THREE.Shape();
+  s.moveTo(-W / 2 + r, -D / 2);
+  s.lineTo(-rb, -D / 2);
+  s.absarc(0, -D / 2, rb, Math.PI, Math.PI * 2, false);
+  s.lineTo(W / 2 - r, -D / 2); s.quadraticCurveTo(W / 2, -D / 2, W / 2, -D / 2 + r);
+  s.lineTo(W / 2, D / 2 - r); s.quadraticCurveTo(W / 2, D / 2, W / 2 - r, D / 2);
+  s.lineTo(-W / 2 + r, D / 2); s.quadraticCurveTo(-W / 2, D / 2, -W / 2, D / 2 - r);
+  s.lineTo(-W / 2, -D / 2 + r); s.quadraticCurveTo(-W / 2, -D / 2, -W / 2 + r, -D / 2);
+  return s;
+}
+/** паличка: прямокутник із заокругленим верхнім торцем */
+function stickShape(w, len) {
+  const r = w / 2, s = new THREE.Shape();
+  s.moveTo(-r, 0); s.lineTo(r, 0); s.lineTo(r, len - r);
+  s.absarc(0, len - r, r, 0, Math.PI, false);
+  s.lineTo(-r, 0);
+  return s;
+}
+/** рельєф хатинки для bump-карти: що світліше — то вище */
+const VILLAGE_RELIEF = { ground: '#4a4a4a', walls: '#7a7a7a', roof: '#b4b4b4', roofSnow: '#f0f0f0', door: '#5a5a5a', windows: '#3c3c3c', frames: '#a0a0a0', trees: '#909090', treeSnow: '#d8d8d8' };
+
 function shapeFrom(pts) {
   const s = new THREE.Shape();
   pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
@@ -202,8 +272,11 @@ function roundedRect(w, h, r) {
 async function traceVillageSvg() {
   const canvas = await rasterize(villageOnly({}, { idp: 'vt', bare: true, mono: '#000' }), VW * VS, VILLAGE_H * VS);
   const px = traceAlpha(canvas);
-  const W = VW * KV, H = VILLAGE_H * KV;
-  return { pts: px.map(([x, y]) => [(x / VS - VW / 2) * KV, (VILLAGE_H - y / VS) * KV]), W, H, fromPhoto: false };
+  // масштаб — так, щоб силует хатинки з ялинками мав реальну ширину STAND.widthCm
+  const xs = px.map(([x]) => x / VS);
+  const kv = STAND.widthCm / (Math.max(...xs) - Math.min(...xs));
+  const W = VW * kv, H = VILLAGE_H * kv;
+  return { pts: px.map(([x, y]) => [(x / VS - VW / 2) * kv, (VILLAGE_H - y / VS) * kv]), W, H, fromPhoto: false };
 }
 /** з фото PNG із прозорим фоном — 1-в-1 з реальним виробом */
 async function traceVillagePhoto(tex) {
@@ -251,23 +324,23 @@ export class Viewer {
     // світла студія: м’яке денне «вікно» + теплий ключовий + легкий контровий (видно фаску, волокна й шари фарби)
     const hemi = new THREE.HemisphereLight(DAY.sky, DAY.ground, DAY.hemi); scene.add(hemi);
     const key = new THREE.DirectionalLight(DAY.key, DAY.keyI);
-    key.position.set(8, 20, 22);
+    key.position.set(7, 16, 17);
     key.castShadow = !LOW;
     key.shadow.mapSize.set(1024, 1024);
-    Object.assign(key.shadow.camera, { left: -16, right: 16, top: 30, bottom: -4, near: 1, far: 70 });
+    Object.assign(key.shadow.camera, { left: -11, right: 11, top: 19, bottom: -3, near: 1, far: 50 });
     key.shadow.bias = -0.0006;
     key.shadow.normalBias = 0.02;
     scene.add(key);
     let rim = null;
-    if (!LOW) { rim = new THREE.DirectionalLight(DAY.rim, DAY.rimI); rim.position.set(-12, 14, -14); scene.add(rim); }
-    const candle = new THREE.PointLight(0xffa860, 60, 40, 2); candle.position.set(0, 7, 10); scene.add(candle);
+    if (!LOW) { rim = new THREE.DirectionalLight(DAY.rim, DAY.rimI); rim.position.set(-9, 11, -11); scene.add(rim); }
+    const candle = new THREE.PointLight(0xffa860, 25, 40, 2); candle.position.set(0, 5, 9); scene.add(candle);
     this.L = { hemi, key, rim, candle };
 
     // підставка «стоїть на столі»: м’яка контактна тінь завжди + справжня тінь від ключового світла (крім слабких GPU)
-    const blob = new THREE.Mesh(new THREE.PlaneGeometry(30, 16), new THREE.MeshBasicMaterial({ map: blobShadowTex(), transparent: true, depthWrite: false, opacity: LOW ? 1 : 0.7 }));
+    const blob = new THREE.Mesh(new THREE.PlaneGeometry(22, 11), new THREE.MeshBasicMaterial({ map: blobShadowTex(), transparent: true, depthWrite: false, opacity: LOW ? 1 : 0.7 }));
     blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; scene.add(blob);
     if (!LOW) {
-      const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.ShadowMaterial({ opacity: 0.22, color: 0x4a3020 }));
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.ShadowMaterial({ opacity: 0.22, color: 0x4a3020 }));
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
     }
 
@@ -289,82 +362,88 @@ export class Viewer {
     this.photo = { front: pf, back: pb, village: pv };
     this.faceUnit = faceUnit;
 
-    const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.7, ...o });
+    const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.78, ...o });
+    const gypsum = { color: 0xf3efe7, roughness: 0.93 }; // білий матовий «гіпс»
     this.m = {
-      starFront: std({ map: faceUnit, roughness: 0.62 }),
-      starBack: std({ map: pb || faceUnit }),
-      edge: std({ map: edgeTex, roughness: 0.85 }),
-      ply: std({ map: faceCm, roughness: 0.75 }),
-      silFront: std({ roughness: 0.6 }),
-      dark: std({ color: 0x2b1d12, roughness: 1 }),
+      starFront: std({ ...gypsum }), // ажурний шар; лице — розпис (матовий акрил, золото — металік)
+      white: std({ ...gypsum }),
+      plyFace: std({ map: faceUnit, roughness: 0.82 }), // берёзова фанера, видна крізь вирізи
+      starBack: std({ map: pb || faceUnit, roughness: 0.82 }),
+      edge: std({ map: edgeTex, roughness: 0.88 }),
+      stick: std({ map: faceCm, color: 0xd9a86c, roughness: 0.8 }), // паличка — тепліше й темніше за фанеру
+      metal: std({ color: 0xbdb6aa, metalness: 0.85, roughness: 0.38 }),
+      dark: std({ color: 0x2b2420, roughness: 0.9 }),
+      silFront: std({ ...gypsum, color: 0xffffff }),
     };
 
     const product = (this.product = new THREE.Group());
     scene.add(product);
+    const add = (mesh, cast = true) => { mesh.castShadow = cast; mesh.receiveShadow = true; product.add(mesh); return mesh; };
 
-    /* ----- підставка: платформа з пазами ----- */
-    const fc = 0.08;
-    const footGeo = new THREE.ExtrudeGeometry(roundedRect(FOOT.widthCm, FOOT.depthCm, 0.35), {
-      depth: FOOT.thicknessCm - 2 * fc, steps: 1, curveSegments: 6,
+    /* ----- основа 155 × 60 мм із півкруглим виступом-заметом спереду ----- */
+    const fc = 0.06;
+    const footGeo = new THREE.ExtrudeGeometry(footShape(FOOT.widthCm, FOOT.depthCm, 0.5, STAND.drift.radiusCm), {
+      depth: FOOT.thicknessCm - 2 * fc, steps: 1, curveSegments: 10,
       bevelEnabled: true, bevelThickness: fc, bevelSize: fc, bevelOffset: -fc, bevelSegments: 2,
     });
     footGeo.rotateX(-Math.PI / 2);
     footGeo.translate(0, fc, 0);
-    const foot = new THREE.Mesh(footGeo, [this.m.ply, this.m.edge]);
-    foot.castShadow = foot.receiveShadow = true;
-    product.add(foot);
+    add(new THREE.Mesh(footGeo, this.m.white));
+    // сніговий замет, у який встромлена паличка
+    const drift = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.m.white);
+    drift.scale.set(STAND.drift.radiusCm * 0.92, STAND.drift.heightCm, STAND.drift.radiusCm * 0.82);
+    drift.position.set(0, FOOT_TOP - 0.02, STICK_Z);
+    add(drift);
 
-    /* ----- силует села ----- */
+    /* ----- хатинка з ялинками: білий матовий силует із рельєфом ----- */
     let sil = pv ? await traceVillagePhoto(pv) : null;
     if (!sil) sil = await traceVillageSvg();
     this.sil = sil;
-    const xs = sil.pts.map((p) => p[0]), ys = sil.pts.map((p) => p[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys);
-    const silGeo = plate(shapeFrom(sil.pts), SIL_T, SIL_CH, (x, y, front) => {
-      const u = x / sil.W + 0.5, v = y / sil.H;
-      return front ? [u, v] : [x, y]; // зворот — просто дерево в см
-    });
-    const silMesh = (this.silMesh = new THREE.Mesh(silGeo, [this.m.silFront, this.m.edge, this.m.ply]));
-    silMesh.position.set(0, SIL_BOTTOM - minY, SIL_Z);
-    silMesh.castShadow = silMesh.receiveShadow = true;
-    product.add(silMesh);
-    // паз під силует і паз під паличку (темні щілини у платформі)
-    const groove = new THREE.Mesh(new THREE.PlaneGeometry(maxX - minX + 0.12, SIL_T + 0.05), this.m.dark);
-    groove.rotation.x = -Math.PI / 2;
-    groove.position.set((minX + maxX) / 2, FOOT_TOP + 0.004, SIL_Z);
-    const slot = new THREE.Mesh(new THREE.PlaneGeometry(STK.widthCm + 0.08, STK.thicknessCm + 0.05), this.m.dark);
-    slot.rotation.x = -Math.PI / 2;
-    slot.position.set(0, FOOT_TOP + 0.004, STICK_Z);
-    product.add(groove, slot);
-
-    /* ----- зірка на паличці ----- */
-    const starY = (this.starY = STAND.starCenterCm != null
-      ? FOOT_TOP + STAND.starCenterCm
-      : SIL_BOTTOM + (VILLAGE_H + (COMP.village.y - COMP.star.y)) * KV);
-    const starGeo = plate(starShape(), T, CH, (x, y, front) => [((front ? x : -x) / HALF + 1) / 2, (y / HALF + 1) / 2]);
-    const star = (this.star = new THREE.Mesh(starGeo, [this.m.starFront, this.m.edge, this.m.starBack]));
-    star.position.set(0, starY, STAR_Z);
-    star.castShadow = star.receiveShadow = true;
-    product.add(star);
-
-    const stickBottom = FOOT_TOP - STK.slotDepthCm, stickTop = starY + 1.2;
-    const stick = new THREE.Mesh(new THREE.BoxGeometry(STK.widthCm, stickTop - stickBottom, STK.thicknessCm), [this.m.edge, this.m.edge, this.m.ply, this.m.ply, this.m.ply, this.m.ply]);
-    stick.position.set(0, (stickTop + stickBottom) / 2, STICK_Z);
-    stick.castShadow = true;
-    product.add(stick);
-
-    /* ----- «Заготовка» села без фото: чистий силует з легкими тінями рельєфу ----- */
+    const minY = Math.min(...sil.pts.map((p) => p[1]));
+    const silGeo = plate(shapeFrom(sil.pts), SIL_T, SIL_CH, (x, y, front) => (front ? [x / sil.W + 0.5, y / sil.H] : [x, y]));
+    const silMesh = (this.silMesh = new THREE.Mesh(silGeo, [this.m.silFront, this.m.white, this.m.white]));
+    silMesh.position.set(0, FOOT_TOP - minY - 0.01, SIL_Z);
+    add(silMesh);
     if (!pv) {
-      const kit = await rasterize(villageOnly({}, { idp: 'vk', bare: true, layers: new Set() }), VW * VS, VILLAGE_H * VS, VILLAGE.bare.fill);
-      this.kitVillage = canvasTex(kit);
-      this.kitVillage.anisotropy = aniso;
-    } else this.kitVillage = pv;
+      const relief = await rasterize(villageOnly(VILLAGE_RELIEF, { idp: 'vb', bare: false }), VW * 2, VILLAGE_H * 2, '#000');
+      this.m.silFront.bumpMap = dataTex(relief);
+      this.m.silFront.bumpScale = 1.6;
+    }
+
+    /* ----- паличка 12,8 × 6,3 × 107 мм із заокругленим верхом; гвинтик-вісь і шайба ----- */
+    const stickTop = STAR_Y + 0.9;
+    const sb = 0.03;
+    const stickGeo = new THREE.ExtrudeGeometry(stickShape(STK.widthCm, STK.lengthCm), {
+      depth: STK.thicknessCm - 2 * sb, steps: 1, curveSegments: 10,
+      bevelEnabled: true, bevelThickness: sb, bevelSize: sb, bevelOffset: -sb, bevelSegments: 1,
+    });
+    stickGeo.translate(0, 0, -(STK.thicknessCm - 2 * sb) / 2);
+    const stick = add(new THREE.Mesh(stickGeo, this.m.stick));
+    stick.position.set(0, stickTop - STK.lengthCm, STICK_Z);
+    const cyl = (r1, r2, h, z, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, 20), mat); m.rotation.x = Math.PI / 2; m.position.set(0, STAR_Y, z); return add(m); };
+    cyl(0.42, 0.42, STAND.washerCm, STICK_Z + STK.thicknessCm / 2 + STAND.washerCm / 2, this.m.metal); // шайба
+    const back = STICK_Z - STK.thicknessCm / 2;
+    cyl(0.3, 0.34, 0.14, back - 0.07, this.m.metal); // голівка гвинтика ззаду
+    const slit = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.03), this.m.dark);
+    slit.position.set(0, STAR_Y, back - 0.14); product.add(slit);
+
+    /* ----- зірка 118 мм, 6,2 мм: фанера 3,2 мм + білий ажурний шар 3,0 мм. Обертається на гвинтику ----- */
+    this.starY = STAR_Y;
+    const uvStar = (x, y, front) => [((front ? x : -x) / HALF + 1) / 2, (y / HALF + 1) / 2];
+    const star = (this.star = new THREE.Group());
+    star.position.set(0, STAR_Y, STAR_Z);
+    const plyLayer = new THREE.Mesh(plate(starShape(), T_BACK, CH, uvStar), [this.m.plyFace, this.m.edge, this.m.starBack]);
+    plyLayer.position.z = T_BACK / 2;
+    const lace = new THREE.Mesh(plate(openworkShape(), T_FRONT, CH, uvStar), [this.m.starFront, this.m.white, this.m.white]);
+    lace.position.z = T_BACK + T_FRONT / 2 + 0.002;
+    [plyLayer, lace].forEach((m) => { m.castShadow = m.receiveShadow = true; star.add(m); });
+    product.add(star);
 
     /* ----- сніжинки ----- */
     const N = LOW ? 60 : 170, pos = new Float32Array(N * 3);
-    for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 50; pos[i * 3 + 1] = Math.random() * 42; pos[i * 3 + 2] = (Math.random() - 0.5) * 30 - 4; }
+    for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 34; pos[i * 3 + 1] = Math.random() * 26; pos[i * 3 + 2] = (Math.random() - 0.5) * 20 - 3; }
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.snow = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.42, map: dotTex(), transparent: true, depthWrite: false, opacity: 0.55, color: 0xfff1dc }));
+    this.snow = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.26, map: dotTex(), transparent: true, depthWrite: false, opacity: 0.55, color: 0xfff1dc }));
     this.snow.visible = this.light === 'candle';
     scene.add(this.snow);
 
@@ -372,7 +451,7 @@ export class Viewer {
     const c = (this.controls = new OrbitControls(this.camera, r.domElement));
     Object.assign(c, {
       enableDamping: true, dampingFactor: 0.08, enablePan: false,
-      minDistance: 14, maxDistance: 95, rotateSpeed: 0.85, zoomSpeed: 0.8,
+      minDistance: 8, maxDistance: 70, rotateSpeed: 0.85, zoomSpeed: 0.8,
       autoRotate: false, autoRotateSpeed: 1.6, minPolarAngle: 0.05, maxPolarAngle: Math.PI * 0.92,
     });
     c.addEventListener('start', () => { this.dragging = true; this.tween = null; this.touched = true; });
@@ -381,9 +460,9 @@ export class Viewer {
     this.initSpin(r.domElement);
 
     this.views = {
-      front: { target: [0, starY, STAR_Z], dir: [0, 0.04, 1], dist: 44 },
-      side: { target: [0, starY, STAR_Z], dir: [0.95, 0.14, 0.32], dist: 37 },
-      stand: { target: [0, starY * 0.56, 0], dir: [0.36, 0.3, 1], dist: 62 },
+      front: { target: [0, STAR_Y, STAR_Z], dir: [0, 0.04, 1], dist: 30 },
+      side: { target: [0, STAR_Y, STAR_Z], dir: [0.95, 0.14, 0.32], dist: 22 },
+      back: { target: [0, STAR_Y, STICK_Z], dir: [-0.25, 0.1, -1], dist: 26 },
     };
     this.setView(this.viewName, true);
 
@@ -425,7 +504,7 @@ export class Viewer {
     const sc = state.star.colors, vc = state.village.colors;
     const sGold = hasGold(d, sc) && (!starLayers || [...starLayers].length), vGold = hasGold(VILLAGE, vc);
     const [star, starM, vil, vilM] = await Promise.all([
-      rasterize(starOnly(state.star.designId, sc, { idp: 'tx', bare: true, layers: starLayers }), TEX, TEX, '#E2C08B'),
+      rasterize(starOnly(state.star.designId, sc, { idp: 'tx', bare: false, layers: starLayers }), TEX, TEX, '#F1EDE4'),
       sGold ? rasterize(metalSvg(starOnly(state.star.designId, metalColors(d, sc), { idp: 'tm', bare: false, layers: starLayers })), 512, 512, PLAIN) : null,
       rasterize(villageOnly(vc, { idp: 'vx', bare: true, layers: villageLayers }), VW * VS, VILLAGE_H * VS, VILLAGE.bare.fill),
       vGold ? rasterize(metalSvg(villageOnly(metalColors(VILLAGE, vc), { idp: 'vm', bare: false, layers: villageLayers })), VW * 2, VILLAGE_H * 2, PLAIN) : null,
@@ -441,35 +520,47 @@ export class Viewer {
 
   setLook(look) { this.look = look; this.applyLook(); }
 
-  /* ---------- освітлення: «день» або «світло свічки» (теплий вогник знизу з живим мерехтінням) ---------- */
+  /* ---------- освітлення: «день» або «свічка». Перехід плавний (~0,8 с), полум’я мерехтить ---------- */
   setLight(mode) {
     this.light = mode;
-    const L = this.L;
-    if (!L) return;
-    const candle = mode === 'candle';
-    L.hemi.color.set(candle ? 0xffb07a : DAY.sky); L.hemi.groundColor.set(candle ? 0x2a1208 : DAY.ground);
-    L.hemi.intensity = candle ? 0.22 : DAY.hemi;
-    L.key.color.set(candle ? 0xffb27a : DAY.key); L.key.intensity = candle ? 0.35 : DAY.keyI;
-    if (L.rim) { L.rim.color.set(candle ? 0xff7a30 : DAY.rim); L.rim.intensity = candle ? 0.5 : DAY.rimI; }
-    if (this.snow) this.snow.visible = candle; // сніжок — лише ввечері, на темному
-    L.candle.color.set(candle ? 0xff9a42 : 0xffa860);
-    L.candle.distance = candle ? 70 : 40;
-    if (candle) L.candle.position.set(0, this.starY - 11, STAR_Z + 9);
-    else { L.candle.position.set(0, 7, 10); L.candle.intensity = 60; }
-    this.renderer.toneMappingExposure = candle ? 1.18 : DAY.exposure;
+    if (!this.L) return;
+    const c = mode === 'candle';
+    this.lt = {
+      sky: new THREE.Color(c ? 0xffb07a : DAY.sky), ground: new THREE.Color(c ? 0x2a1208 : DAY.ground), hemi: c ? 0.2 : DAY.hemi,
+      key: new THREE.Color(c ? 0xffb27a : DAY.key), keyI: c ? 0.3 : DAY.keyI,
+      rim: new THREE.Color(c ? 0xff7a30 : DAY.rim), rimI: c ? 0.45 : DAY.rimI,
+      flame: new THREE.Color(c ? 0xff9a42 : 0xffa860), flameI: c ? 110 : 25,
+      flamePos: c ? new THREE.Vector3(0, STAR_Y - 7.5, STAR_Z + 5.5) : new THREE.Vector3(0, 5, 9),
+      exposure: c ? 1.15 : DAY.exposure, snow: c ? 0.55 : 0,
+    };
+    if (!this.ltNow) { this.ltNow = true; this.stepLight(1); } // перший кадр — одразу, без переходу
+  }
+  /** k ∈ (0..1] — частка шляху до цільового світла за цей кадр */
+  stepLight(k) {
+    const L = this.L, t = this.lt;
+    if (!t) return;
+    const n = (a, b) => a + (b - a) * k;
+    L.hemi.color.lerp(t.sky, k); L.hemi.groundColor.lerp(t.ground, k); L.hemi.intensity = n(L.hemi.intensity, t.hemi);
+    L.key.color.lerp(t.key, k); L.key.intensity = n(L.key.intensity, t.keyI);
+    if (L.rim) { L.rim.color.lerp(t.rim, k); L.rim.intensity = n(L.rim.intensity, t.rimI); }
+    L.candle.color.lerp(t.flame, k); L.candle.position.lerp(t.flamePos, k);
+    this.flameBase = n(this.flameBase ?? t.flameI, t.flameI);
+    this.renderer.toneMappingExposure = n(this.renderer.toneMappingExposure, t.exposure);
+    if (this.snow) { this.snow.material.opacity = n(this.snow.material.opacity, t.snow); this.snow.visible = this.snow.material.opacity > 0.02; }
   }
   applyLook() {
     if (!this.ready) return;
     const painted = this.look === 'painted';
+    // матовий акрил (шорсткість 0,78); золото — металік 0,65 / 0,28 через карту (B = метал, G = шорсткість)
     const setFace = (mat, map, metal) => {
-      mat.map = map;
+      mat.map = map || null;
       mat.metalnessMap = mat.roughnessMap = metal || null;
-      mat.metalness = metal ? 1 : 0;
-      mat.roughness = metal ? 0.62 : painted ? 0.58 : 0.7;
+      mat.metalness = metal ? 0.65 : 0;
+      mat.roughness = 0.78;
       mat.needsUpdate = true;
     };
-    setFace(this.m.starFront, painted ? this.tex.star || this.faceUnit : this.photo.front || this.faceUnit, painted ? this.tex.starM : null);
-    setFace(this.m.silFront, painted ? this.tex.vil || this.kitVillage : this.kitVillage, painted ? this.tex.vilM : null);
+    setFace(this.m.starFront, painted ? this.tex.star : this.photo.front, painted ? this.tex.starM : null);
+    setFace(this.m.silFront, painted ? this.tex.vil : this.photo.village, painted ? this.tex.vilM : null);
   }
 
   /* ---------- ракурси (плавний переліт камери навколо цілі) ---------- */
@@ -479,8 +570,9 @@ export class Viewer {
     const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
     const vf = THREE.MathUtils.degToRad(this.camera.fov) / 2;
     const hf = Math.atan(Math.tan(vf) * this.camera.aspect);
-    const halfW = Math.hypot(size.x, size.z) / 2, halfH = size.y / 2;
-    const dist = Math.max(halfH / Math.tan(vf), halfW / Math.tan(hf)) * 1.06 + size.z / 2;
+    // ширина — між фронтальною й діагональною (при огляді збоку виріб вужчий), щоб зірка була більшою
+    const halfW = (size.x + Math.hypot(size.x, size.z)) / 4, halfH = size.y / 2;
+    const dist = Math.max(halfH / Math.tan(vf), halfW / Math.tan(hf)) * 1.04 + size.z / 2;
     return { target: ctr.toArray(), dir: [0.2, 0.08, 1], dist };
   }
 
@@ -493,7 +585,7 @@ export class Viewer {
       const rect = el.getBoundingClientRect();
       ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
       ray.setFromCamera(ndc, this.camera);
-      if (!ray.intersectObject(this.star, false).length) return; // фон — віддаємо камері
+      if (!ray.intersectObject(this.star, true).length) return; // фон — віддаємо камері
       e.stopPropagation(); // OrbitControls цей дотик не отримає
       this.star.getWorldPosition(v);
       // дивимось на лице чи на зворот — від цього залежить напрям обертання
@@ -547,6 +639,12 @@ export class Viewer {
     dth = ((((dth + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
     this.tween = { t: 0, dur: 1.0, s0, s1: new THREE.Spherical(s1.radius, s1.phi, s0.theta + dth), t0: this.controls.target.clone(), t1 };
     this.resumeAt = this.t + 3.5;
+  }
+  /** кнопка «Крутити зірку»: поштовх за годинниковою стрілкою, як пальцем по вертушці */
+  spinKick(v = -7) {
+    if (!this.spin) return;
+    this.spin.vel = THREE.MathUtils.clamp(this.spin.vel + v, -22, 22);
+    this.touched = true; this.resumeAt = this.t + 3;
   }
   setAuto(on) { this.auto = on; if (on) this.resumeAt = this.t; }
 
@@ -648,16 +746,17 @@ export class Viewer {
       if (Math.abs(snap - z) > 1e-4) this.star.rotation.z += (snap - z) * (1 - Math.exp(-dt * 5));
     }
     this.controls.update(dt);
-    if (this.light === 'candle') { // живе полум’я: кілька повільних хвиль, без різких спалахів
-      const t = this.t;
-      this.L.candle.intensity = 260 * (1 + 0.07 * Math.sin(t * 6.3) + 0.045 * Math.sin(t * 11.7 + 1.3) + 0.03 * Math.sin(t * 2.1));
+    this.stepLight(1 - Math.exp(-dt * 3.6)); // ~0,8 с від дня до свічки
+    { // живе полум’я: кілька повільних хвиль, без різких спалахів
+      const t = this.t, f = this.light === 'candle' ? 1 + 0.07 * Math.sin(t * 6.3) + 0.045 * Math.sin(t * 11.7 + 1.3) + 0.03 * Math.sin(t * 2.1) : 1;
+      this.L.candle.intensity = (this.flameBase || 0) * f;
     }
     // сніг
     const p = this.snow.visible ? this.snow.geometry.attributes.position : null;
     if (p) {
     for (let i = 0; i < p.count; i++) {
       let y = p.getY(i) - dt * (0.9 + (i % 5) * 0.25);
-      if (y < 0) y += 42;
+      if (y < 0) y += 26;
       p.setY(i, y);
       p.setX(i, p.getX(i) + Math.sin(this.t * 0.6 + i) * dt * 0.25);
     }

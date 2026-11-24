@@ -32,12 +32,12 @@ export function createTour(steps) {
     root.innerHTML = `
       <svg class="tour-dim" aria-hidden="true"><path fill-rule="evenodd"/></svg>
       <div class="tour-rings"></div>
-      <div class="tour-hand" aria-hidden="true"><span>👆</span></div>
+      <div class="tour-hand" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M19 27V9.5a3 3 0 0 1 6 0V22l9.6 2.2a4 4 0 0 1 3 4.6L36 38c-.4 2.4-2.5 4-4.9 4H24c-1.6 0-3-.7-4-2l-7.4-9.3a2.8 2.8 0 0 1 4.2-3.7z"/><path d="M14 9a8.5 8.5 0 0 1 16 0" class="arc"/></svg></div>
       <div class="tour-card" role="dialog" aria-modal="false" aria-live="polite" aria-label="Коротка підказка">
         <button class="tour-skip" type="button">Пропустити</button>
         <div class="tour-dots"></div>
         <p class="tour-text"></p>
-        <button class="btn btn-gold tour-next" type="button"></button>
+        <button class="btn btn-ink tour-next" type="button"></button>
       </div>`;
     document.body.appendChild(root);
     document.body.classList.add('tour-on');

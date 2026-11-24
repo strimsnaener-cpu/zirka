@@ -3,28 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#faf6f0">
+  <meta name="theme-color" content="#F5EFE4">
   <title>Зірка оживає — Lava Aroma Candles</title>
   <meta name="description" content="Lava Aroma Candles: гортай готові узори й приміряй кольори на 3D-зірці.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cpath d='M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z' fill='%23C8963E'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cpath d='M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z' fill='none' stroke='%23241B15' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
 </head>
 <body>
-  <!-- Один екран: шапка · 3D-сцена · док із двома вкладками. Без прокрутки сторінки. -->
+  <!-- Один аркуш: шапка · 3D-сцена в рамці з мітками обрізу · док. Без прокрутки сторінки. -->
   <div class="app">
     <header class="top">
       <span class="brand">
-        <svg class="brand-mark" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z"/></svg>
-        <span class="brand-t">Lava Aroma <span>Candles</span></span>
+        <svg class="brand-mark" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0-9.5 2-4.8 6.7-6.7 4.8-2 9.5 0 4.8 2 6.7 6.7 2 4.8 0 9.5-2 4.8-6.7 6.7-4.8 2-9.5 0-4.8-2-6.7-6.7-2-4.8Z"/><circle r="2.1"/></svg>
+        <span class="brand-t">Lava Aroma <em>Candles</em></span>
       </span>
       <div class="top-r">
         <div class="light" role="group" aria-label="Світло">
-          <button data-light="day" class="is-on" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>День</button>
-          <button data-light="candle" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3-2.6 4.7-2.6 8a2.6 2.6 0 0 0 5.2.3c1.6 1.4 2.4 3 2.4 4.7A5 5 0 0 1 12 20.5a5 5 0 0 1-5-5c0-4.6 5-6.5 5-13z"/></svg>Свічка</button>
+          <button data-light="day" class="is-on" aria-pressed="true">День</button>
+          <span class="light-sep" aria-hidden="true">/</span>
+          <button data-light="candle" aria-pressed="false">Свічка</button>
         </div>
         <button class="help-btn" id="helpBtn" aria-label="Як це працює?">?</button>
       </div>
@@ -32,9 +33,12 @@
 
     <main class="stage">
       <div class="stage-card" id="stageCard">
+        <i class="crop crop-tl" aria-hidden="true"></i><i class="crop crop-tr" aria-hidden="true"></i><i class="crop crop-bl" aria-hidden="true"></i><i class="crop crop-br" aria-hidden="true"></i>
         <div class="viewer" id="viewer3d" aria-label="3D-зірка на підставці. Свайп по зірці крутить її, свайп по фону — огляд з усіх боків.">
           <div class="viewer-loading">Запалюємо зірку…</div>
         </div>
+        <p class="caption" aria-hidden="true">Зірка на хатинці <span>· 165 мм</span></p>
+        <button class="spin-btn" data-spin><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5"/><path d="M17.6 2.8l-.3 3.9-3.9-.2"/></svg>Крутити зірку</button>
       </div>
     </main>
 
@@ -45,10 +49,10 @@
       </div>
       <div class="pane" id="pane-ideas" data-pane="ideas" role="tabpanel" aria-labelledby="tab-ideas">
         <div class="strip" id="strip" aria-label="Узори. Гортай вбік і тапни картку."></div>
-        <button class="btn btn-gold rand" data-random><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.5" cy="8.5" r="1.3"/><circle cx="8.5" cy="15.5" r="1.3"/></svg>Випадкова ідея</button>
+        <button class="btn btn-ink rand" data-random><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 5.2l14.3-.7.7 14.3-14.3.7z"/><circle cx="8.6" cy="8.8" r="1.2"/><circle cx="15.4" cy="15.2" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="15.3" cy="8.6" r="1.2"/><circle cx="8.7" cy="15.4" r="1.2"/></svg>Випадкова ідея</button>
       </div>
       <div class="pane" id="pane-colors" data-pane="colors" role="tabpanel" aria-labelledby="tab-colors" hidden>
-        <div class="parts" id="parts" aria-label="Деталь зірки"></div>
+        <div class="parts" id="parts" aria-label="Що фарбуємо"></div>
         <div class="paints" id="paints" aria-label="Фарби"></div>
       </div>
     </nav>

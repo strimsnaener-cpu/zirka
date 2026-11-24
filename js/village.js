@@ -33,7 +33,7 @@ const THATCH = Array.from({ length: 9 }, (_, i) => {
 
 export const VILLAGE = {
   id: 'village', title: 'Моє різдвяне село',
-  bare: { fill: '#EEF0F3', shade: '#D3D7DE' },
+  bare: { fill: '#F2EEE6', shade: '#E2DCD0' }, // білий матовий виріб без розпису
   slots: {
     ground: { label: 'Сніговий пагорб', def: 'white' },
     walls: { label: 'Стіни й комин', def: 'white' },
