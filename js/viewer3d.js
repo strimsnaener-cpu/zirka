@@ -309,7 +309,7 @@ export class Viewer {
     key.castShadow = !LOW;
     key.shadow.mapSize.set(2048, 2048);
     key.shadow.radius = 3;
-    Object.assign(key.shadow.camera, { left: -11, right: 11, top: 19, bottom: -3, near: 1, far: 50 });
+    Object.assign(key.shadow.camera, { left: -11, right: 11, top: 23, bottom: -3, near: 1, far: 55 });
     key.shadow.bias = -0.0006;
     key.shadow.normalBias = 0.02;
     scene.add(key);
